@@ -4,3 +4,13 @@
   url: https://github.com/noahelhadedy/347-design-inspiration-sites
   role: upstream-index
   notes: "灵感站总目录；定期 diff 新增候选，不混入 Core/Candidate 短名单"
+- id: awesome-design-skills
+  name: awesome-design-skills
+  url: https://github.com/bergside/awesome-design-skills
+  role: upstream-index
+  notes: "DESIGN.md + SKILL.md 目录；定期 diff，不进 5 站短名单"
+- id: awesome-shadcn-ui
+  name: awesome-shadcn-ui
+  url: https://github.com/birobirobiro/awesome-shadcn-ui
+  role: upstream-index
+  notes: "shadcn 生态 awesome；间接补 admin/table/settings"

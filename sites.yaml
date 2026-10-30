@@ -359,28 +359,128 @@
   url: https://www.assistant-ui.com/elements
   aliases: []
   status: candidate
+  kind: component
+  covers:
+  - approval-gate
+  - diff-review
+  - citation
+  - canvas
+  - tool-call
+  - permission-denied
+  - trace-waterfall
+  - reasoning-trace
+- id: screenrove
+  name: Screenrove
+  url: https://screenrove.com/
+  aliases: []
+  status: candidate
   kind: product-flow
   covers:
-  - data-table
-  - agent-flow
-  search_hint: '## 推荐
-
-    Agent UI 元素索引：Approval、Code diff、Inline citation、Canvas、Tool call、Permission、Trace
-    waterfall。
-
-    GH: https://github.com/assistant-ui/assistant-ui
-
-
-    ## 建议归类
-
-    - status 目标：candidate · component
-
-    - covers: approval-gate, diff-review, citation, canvas, tool-call, permission-denied,
-    trace-waterfall, reasoning-trace
-
-
-    ## 来源
-
-    SKILL HOT + GitHub Hot 双荐；2026-10-30 合表首批。'
+    - empty-state
+    - data-table
+    - settings
+    - filter-builder
+    - filter-chips
+    - onboarding
+  search_hint: "真实 SaaS 截图画廊；空态/表格/设置/筛选 chips；可走 /agents MCP"
   auth: none
-  added_at: '2026-10-30'
+  added_at: "2026-10-30"
+- id: designme
+  name: Designme
+  url: https://designme.dev/
+  aliases: []
+  status: candidate
+  kind: component
+  covers:
+    - diff-review
+    - approval-gate
+    - citation
+    - canvas
+    - agent-plan
+    - permission-denied
+  search_hint: "Agent 产品组件库：Change/Plan review、Permission、Citation、Canvas、Trace"
+  auth: none
+  added_at: "2026-10-30"
+- id: data-table-openstatus
+  name: OpenStatus Data Table
+  url: https://data-table.openstatus.dev/
+  aliases: []
+  status: candidate
+  kind: component
+  covers:
+    - data-table
+    - filter-builder
+    - log-viewer
+  search_hint: "openstatus 生产向表+过滤演示；skill data-table-filters"
+  auth: none
+  added_at: "2026-10-30"
+- id: tremor
+  name: Tremor
+  url: https://tremor.so/
+  aliases:
+    - https://www.tremor.so/
+  status: candidate
+  kind: component
+  covers:
+    - chart
+    - time-series
+    - dashboard
+  search_hint: "仪表盘/图表组件与样例"
+  auth: none
+  added_at: "2026-10-30"
+- id: dashboardblocks
+  name: Dashboardblocks
+  url: https://www.dashboardblocks.com/
+  aliases: []
+  status: candidate
+  kind: component
+  covers:
+    - data-table
+    - filter-builder
+    - dashboard
+    - saved-views
+  search_hint: "shadcn 向仪表盘积木；部分 Pro"
+  auth: none
+  added_at: "2026-10-30"
+- id: saasframe
+  name: SaaSFrame
+  url: https://www.saasframe.io/
+  aliases: []
+  status: candidate
+  kind: product-flow
+  covers:
+    - billing
+    - settings
+    - empty-state
+    - dashboard
+  search_hint: "观察席：真实 SaaS 界面库；爬虫偶发 403"
+  auth: none
+  added_at: "2026-10-30"
+- id: saasui
+  name: SaaSUI.design
+  url: https://www.saasui.design/
+  aliases: []
+  status: candidate
+  kind: product-flow
+  covers:
+    - billing
+    - settings
+    - dashboard
+    - console
+  search_hint: "观察席：按屏幕类型的 SaaS UI；有 /llms.txt"
+  auth: none
+  added_at: "2026-10-30"
+- id: official-design-md
+  name: VoltAgent official-design-md
+  url: https://github.com/VoltAgent/official-design-md
+  aliases:
+    - https://getdesign.md/
+  status: candidate
+  kind: system
+  covers:
+    - design-md
+    - tokens
+    - official-docs
+  search_hint: "公司官方一手 DESIGN.md；与 awesome-design-md 互补，勿合并"
+  auth: none
+  added_at: "2026-10-30"
