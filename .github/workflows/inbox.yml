@@ -9,6 +9,11 @@ permissions:
   contents: write
   issues: write
 
+# Serialize inbox commits to main so concurrent issues don't race-lose pushes.
+concurrency:
+  group: design-pool-inbox-main
+  cancel-in-progress: false
+
 jobs:
   triage:
     if: >
@@ -114,8 +119,25 @@ jobs:
             echo "No config changes to commit"
           else
             git commit -m "chore(inbox): triage #${{ github.event.issue.number }}"
-            git pull --rebase origin main || true
-            git push origin HEAD:main
+            for attempt in 1 2 3 4 5; do
+              if ! git pull --rebase origin main; then
+                echo "::error::git pull --rebase failed (attempt ${attempt})"
+                git rebase --abort 2>/dev/null || true
+                if [ "${attempt}" -eq 5 ]; then
+                  exit 1
+                fi
+                sleep $((attempt * 3))
+                continue
+              fi
+              if git push origin HEAD:main; then
+                echo "Pushed on attempt ${attempt}"
+                exit 0
+              fi
+              echo "Push attempt ${attempt} failed; retrying..."
+              sleep $((attempt * 3))
+            done
+            echo "::error::git push failed after retries"
+            exit 1
           fi
 
       - name: Comment and close
