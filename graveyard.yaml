@@ -1,9 +1,7 @@
-# 已拒收 / 已清退域名墓碑（含原因与冷却期）
-# 字段约定（条目示例）：
-# - domain: example.com
-#   url: https://example.com/
-#   reason: not_gallery | dead_site | low_signal | duplicate
-#   rejected_at: "2026-10-30"
-#   cooldown_until: "2026-12-30"
-#   notes: "可选说明"
-sites: []
+sites:
+- domain: uxpatterns.dev
+  url: https://uxpatterns.dev/patterns/user-feedback/empty-states
+  reason: landing_freeze
+  rejected_at: '2026-10-30'
+  cooldown_until: '2026-12-31'
+  notes: ordinary landing frozen at intake
