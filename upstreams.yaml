@@ -1,0 +1,6 @@
+# 上游索引目录源：供缺口扩池与 Action 定期 diff，不进入单次 5 站短名单
+- id: 347-design-inspiration
+  name: 347 Design Inspiration Sites
+  url: https://github.com/noahelhadedy/347-design-inspiration-sites
+  role: upstream-index
+  notes: "灵感站总目录；定期 diff 新增候选，不混入 Core/Candidate 短名单"

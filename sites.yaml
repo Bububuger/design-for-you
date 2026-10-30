@@ -1,0 +1,386 @@
+# design-pool 主清单：core + candidate
+# 席位配额：product-flow≤10 / component≤12 / landing≤8 / system≤4；candidate≤20
+
+- id: mobbin
+  name: Mobbin
+  url: https://mobbin.com/
+  aliases: []
+  status: core
+  kind: product-flow
+  covers:
+    - onboarding
+    - settings
+    - chat
+    - dashboard
+    - checkout
+    - modal
+    - empty-state
+  search_hint: "登录后按产品/流程/模式筛选真实 App 与 Web 截图"
+  auth: local_session
+  added_at: "2026-10-30"
+
+- id: refero
+  name: Refero
+  url: https://refero.design/
+  aliases: []
+  status: core
+  kind: product-flow
+  covers:
+    - dashboard
+    - search
+    - filter-bar
+    - table
+    - pricing
+    - settings
+    - onboarding
+  search_hint: "按界面类型与产品搜索真实产品截图与动线"
+  auth: optional
+  added_at: "2026-10-30"
+
+- id: 404s
+  name: 404s.design
+  url: https://www.404s.design/
+  aliases: []
+  status: core
+  kind: component
+  covers:
+    - "404"
+    - error-page
+  search_hint: "浏览 404 / 错误页画廊"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: bentogrids
+  name: BentoGrids
+  url: https://bentogrids.com/
+  aliases: []
+  status: core
+  kind: component
+  covers:
+    - bento-grid
+    - feature-grid
+    - card-layout
+  search_hint: "浏览 Bento / 特性栅格布局样例"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: cta-gallery
+  name: CTA Gallery
+  url: https://www.cta.gallery/
+  aliases: []
+  status: core
+  kind: component
+  covers:
+    - cta
+    - button
+    - hero-action
+  search_hint: "按 CTA / 按钮样式浏览"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: footer-design
+  name: Footer.design
+  url: https://www.footer.design/
+  aliases: []
+  status: core
+  kind: component
+  covers:
+    - footer
+  search_hint: "浏览页脚布局画廊"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: navbar-gallery
+  name: Navbar Gallery
+  url: https://www.navbar.gallery/
+  aliases: []
+  status: core
+  kind: component
+  covers:
+    - navbar
+    - header
+    - mega-menu
+    - navigation
+  search_hint: "按导航栏 / 顶栏 / 巨型菜单浏览"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: recent-design
+  name: Recent (Godly)
+  url: https://recent.design/
+  aliases:
+    - https://godly.website/
+  status: core
+  kind: landing
+  covers:
+    - landing-page
+    - dark-mode
+    - micro-interaction
+    - saas-marketing
+  search_hint: "浏览近期高质量落地页与动效站（原 Godly）"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: land-book
+  name: Land-book
+  url: https://land-book.com/
+  aliases: []
+  status: core
+  kind: landing
+  covers:
+    - landing-page
+    - saas-marketing
+    - pricing
+    - portfolio
+  search_hint: "按品类筛选落地页陈列"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: lapa-ninja
+  name: Lapa Ninja
+  url: https://www.lapa.ninja/
+  aliases: []
+  status: core
+  kind: landing
+  covers:
+    - landing-page
+    - ai-landing
+    - pricing
+  search_hint: "浏览落地页与 AI 营销页"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: minimal-gallery
+  name: Minimal Gallery
+  url: https://minimal.gallery/
+  aliases: []
+  status: core
+  kind: landing
+  covers:
+    - minimal
+    - typography
+    - whitespace
+    - landing-page
+  search_hint: "极简风落地页与排版样例"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: dark-mode-design
+  name: Dark Mode Design
+  url: https://www.darkmodedesign.com/
+  aliases: []
+  status: core
+  kind: landing
+  covers:
+    - dark-mode
+    - gradient
+    - landing-page
+  search_hint: "深色模式落地页画廊（超配观察，与 dark-design 二留一）"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: dark-design
+  name: Dark Design
+  url: https://www.dark.design/
+  aliases: []
+  status: core
+  kind: landing
+  covers:
+    - dark-mode
+    - landing-page
+  search_hint: "深色主题网站陈列（超配观察）"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: awwwards
+  name: Awwwards
+  url: https://www.awwwards.com/
+  aliases: []
+  status: core
+  kind: landing
+  covers:
+    - brand-showcase
+    - motion
+    - creative-web
+  search_hint: "按奖项/品类浏览创意整站（超配观察）"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: httpster
+  name: Httpster
+  url: https://httpster.net/
+  aliases: []
+  status: core
+  kind: landing
+  covers:
+    - landing-page
+    - typography
+    - indie-web
+  search_hint: "小而干净的整站陈列（超配观察）"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: siteinspire
+  name: SiteInspire
+  url: https://www.siteinspire.com/
+  aliases: []
+  status: core
+  kind: landing
+  covers:
+    - landing-page
+    - editorial
+    - directory-filter
+  search_hint: "按风格/类型筛选网页设计目录（超配观察）"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: refero-styles
+  name: Refero Styles
+  url: https://styles.refero.design/
+  aliases: []
+  status: core
+  kind: system
+  covers:
+    - design-md
+    - tokens
+    - typography-scale
+    - color-system
+  search_hint: "读取真实产品 DESIGN.md / token / 字号色板，不作单交互截图检索"
+  auth: none
+  added_at: "2026-10-30"
+
+# --- candidate 池（首批 §5.2，上限 20）---
+
+- id: uizze
+  name: UIZZE
+  url: https://uizze.com/
+  aliases: []
+  status: candidate
+  kind: product-flow
+  covers:
+    - dashboard
+    - settings
+    - mobile-app
+    - web-app
+  search_hint: "真实 Web / iOS 产品屏幕库"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: agentic-ux
+  name: Agentic UX
+  url: https://agentic-ux.com/
+  aliases: []
+  status: candidate
+  kind: product-flow
+  covers:
+    - agent-flow
+    - approval-gate
+    - tool-call
+    - streaming-state
+  search_hint: "Agent 交互模式与真实产品实拍"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: shape-of-ai
+  name: Shape of AI
+  url: https://shapeof.ai/
+  aliases: []
+  status: candidate
+  kind: component
+  covers:
+    - ai-prompt
+    - inline-copilot
+    - citation
+    - generative-ui
+  search_hint: "AI 交互模式组件与模式库"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: 60fps
+  name: 60fps.design
+  url: https://60fps.design/
+  aliases: []
+  status: candidate
+  kind: component
+  covers:
+    - micro-interaction
+    - transition
+    - loading-skeleton
+    - gesture
+  search_hint: "微交互与动效样例"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: shadcn-ui
+  name: shadcn/ui
+  url: https://ui.shadcn.com/
+  aliases: []
+  status: candidate
+  kind: component
+  covers:
+    - data-table
+    - form
+    - sidebar
+    - command-palette
+    - dialog
+    - dashboard
+  search_hint: "Blocks / Examples 中的表格、表单、侧栏等组件"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: prompt-kit
+  name: prompt-kit
+  url: https://github.com/ibelick/prompt-kit
+  aliases: []
+  status: candidate
+  kind: component
+  covers:
+    - prompt-input
+    - action-bar
+    - reasoning-trace
+    - chat-message
+  search_hint: "Prompt / Agent UI 组件与示例"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: aceternity-ui
+  name: Aceternity UI
+  url: https://ui.aceternity.com/
+  aliases: []
+  status: candidate
+  kind: component
+  covers:
+    - bento-grid
+    - spotlight
+    - animated-card
+    - ai-landing
+  search_hint: "动效积木与 AI 落地页组件（限组件检索）"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: magic-ui
+  name: Magic UI
+  url: https://magicui.design/
+  aliases: []
+  status: candidate
+  kind: component
+  covers:
+    - bento-grid
+    - spotlight
+    - animated-card
+    - ai-landing
+  search_hint: "动效积木与营销组件（限组件检索）"
+  auth: none
+  added_at: "2026-10-30"
+
+- id: awesome-design-md
+  name: VoltAgent awesome-design-md
+  url: https://github.com/VoltAgent/awesome-design-md
+  aliases: []
+  status: candidate
+  kind: system
+  covers:
+    - design-md
+  search_hint: "多家标杆产品 DESIGN.md 集合，与 Refero Styles 互补"
+  auth: none
+  added_at: "2026-10-30"

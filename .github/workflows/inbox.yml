@@ -1,0 +1,156 @@
+# Issue 收件箱：白名单作者开 [inbox] Issue → triage → candidate / graveyard / needs_human
+name: inbox-triage
+
+on:
+  issues:
+    types: [opened, labeled, reopened]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  triage:
+    if: >
+      contains(join(github.event.issue.labels.*.name, ','), 'inbox')
+      || (github.event.action == 'opened' && contains(github.event.issue.title, 'http'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check allowlist
+        id: allow
+        env:
+          ACTOR: ${{ github.event.issue.user.login }}
+          EXTRA: ${{ vars.INBOX_ALLOWLIST || secrets.INBOX_ALLOWLIST }}
+        run: |
+          set -euo pipefail
+          ALLOW="Bububuger"
+          if [ -n "${EXTRA:-}" ]; then
+            ALLOW="${ALLOW},${EXTRA}"
+          fi
+          IFS=',' read -ra PARTS <<< "$ALLOW"
+          ok=0
+          for p in "${PARTS[@]}"; do
+            p="$(echo "$p" | xargs)"
+            if [ "$p" = "$ACTOR" ]; then ok=1; break; fi
+          done
+          echo "actor=$ACTOR" >> "$GITHUB_OUTPUT"
+          echo "allowed=$ok" >> "$GITHUB_OUTPUT"
+          echo "Allowlist check: actor=$ACTOR allowed=$ok"
+
+      - name: Reject non-allowlisted
+        if: steps.allow.outputs.allowed != '1'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue.number;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue,
+              body: '🚫 非白名单作者。本仓 inbox 仅接受维护者 / 授权 Bot 投喂。已关闭。'
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue,
+              state: 'closed',
+              state_reason: 'not_planned'
+            });
+
+      - name: Checkout
+        if: steps.allow.outputs.allowed == '1'
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        if: steps.allow.outputs.allowed == '1'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        if: steps.allow.outputs.allowed == '1'
+        run: pip install -r requirements.txt
+
+      - name: Ensure inbox label
+        if: steps.allow.outputs.allowed == '1'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = (context.payload.issue.labels || []).map(l => l.name);
+            if (!labels.includes('inbox')) {
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.payload.issue.number,
+                  labels: ['inbox']
+                });
+              } catch (e) {
+                core.warning('Could not add inbox label: ' + e.message);
+              }
+            }
+
+      - name: Run triage
+        if: steps.allow.outputs.allowed == '1'
+        id: triage
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          python scripts/triage.py inbox | tee /tmp/triage-comment.txt
+          test -f /tmp/triage-result.json
+
+      - name: Commit pool changes
+        if: steps.allow.outputs.allowed == '1'
+        run: |
+          set -euo pipefail
+          git config user.name "design-pool-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add sites.yaml graveyard.yaml STATUS.md || true
+          if git diff --cached --quiet; then
+            echo "No config changes to commit"
+          else
+            git commit -m "chore(inbox): triage #${{ github.event.issue.number }}"
+            git pull --rebase origin main || true
+            git push origin HEAD:main
+          fi
+
+      - name: Comment and close
+        if: steps.allow.outputs.allowed == '1'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let body = 'triage finished';
+            try {
+              const result = JSON.parse(fs.readFileSync('/tmp/triage-result.json', 'utf8'));
+              body = result.comment || JSON.stringify(result, null, 2);
+            } catch (e) {
+              try {
+                body = fs.readFileSync('/tmp/triage-comment.txt', 'utf8');
+              } catch (_) {}
+            }
+            const issue = context.payload.issue.number;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue,
+              body
+            });
+            // needs_human: leave open for maintainer; others close
+            let decision = '';
+            try {
+              decision = JSON.parse(fs.readFileSync('/tmp/triage-result.json', 'utf8')).decision || '';
+            } catch (_) {}
+            if (decision !== 'needs_human') {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue,
+                state: 'closed',
+                state_reason: 'completed'
+              });
+            }

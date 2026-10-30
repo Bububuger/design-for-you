@@ -1,0 +1,6 @@
+pyyaml>=6.0
+requests>=2.31
+beautifulsoup4>=4.12
+# 可选：inbox 初筛有 Key 时用其一（无 Key 则规则打标 + needs_human）
+openai>=1.40
+anthropic>=0.34

@@ -1,0 +1,181 @@
+# 每周巡检：死链 / 301 自愈、战绩升降级 stub、刷新 STATUS.md
+# 约定：只提交配置与 STATUS；logs/ 由本机 Skill 追加 push，避免同文件冲突。
+name: weekly-health
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"  # 每周一 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Probe links and heal redirects
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          python << 'PY'
+          """Dead-link / 301 heal. Consecutive failures tracked via .health-state.json (committed)."""
+          from __future__ import annotations
+
+          import json
+          from datetime import date
+          from pathlib import Path
+          from urllib.parse import urlparse
+
+          import requests
+          import yaml
+
+          ROOT = Path(".")
+          SITES = ROOT / "sites.yaml"
+          GRAVEYARD = ROOT / "graveyard.yaml"
+          STATE = ROOT / ".health-state.json"
+          UA = "design-pool-health/1.0 (+https://github.com/Bububuger/design-pool)"
+
+          def load_yaml(p):
+              with open(p, encoding="utf-8") as f:
+                  return yaml.safe_load(f) or []
+
+          def save_yaml(p, data):
+              with open(p, "w", encoding="utf-8") as f:
+                  yaml.safe_dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+
+          def domain(url: str) -> str:
+              h = urlparse(url).netloc.lower()
+              return h[4:] if h.startswith("www.") else h
+
+          sites = load_yaml(SITES)
+          if isinstance(sites, dict):
+              sites = sites.get("sites") or []
+          gy = load_yaml(GRAVEYARD)
+          if isinstance(gy, list):
+              gy_sites = gy
+              gy_wrap = False
+          else:
+              gy_sites = list((gy or {}).get("sites") or [])
+              gy_wrap = True
+
+          state = {}
+          if STATE.exists():
+              state = json.loads(STATE.read_text(encoding="utf-8"))
+          fails = dict(state.get("fail_streak") or {})
+
+          changed = False
+          for site in sites:
+              url = site.get("url") or ""
+              sid = site.get("id") or url
+              try:
+                  r = requests.get(url, timeout=20, allow_redirects=True, headers={"User-Agent": UA})
+                  final = r.url or url
+                  ok = r.status_code < 400
+                  # heal 301/308 style permanent moves when host/path changed
+                  if ok and final.rstrip("/") != url.rstrip("/"):
+                      old = url
+                      aliases = list(site.get("aliases") or [])
+                      if old not in aliases:
+                          aliases.append(old)
+                      site["aliases"] = aliases
+                      site["url"] = final if final.endswith("/") or "?" in final else final
+                      # normalize bare origin
+                      if urlparse(site["url"]).path in ("",):
+                          site["url"] = site["url"].rstrip("/") + "/"
+                      print(f"[heal] {sid}: {old} -> {site['url']}")
+                      changed = True
+                  if ok:
+                      fails[sid] = 0
+                  else:
+                      fails[sid] = int(fails.get(sid, 0)) + 1
+                      print(f"[fail] {sid} status={r.status_code} streak={fails[sid]}")
+              except requests.RequestException as e:
+                  fails[sid] = int(fails.get(sid, 0)) + 1
+                  print(f"[fail] {sid} err={e} streak={fails[sid]}")
+
+          # 连续 3 周失败 → graveyard dead_site
+          remain = []
+          for site in sites:
+              sid = site.get("id") or site.get("url")
+              if int(fails.get(sid, 0)) >= 3:
+                  gy_sites.append({
+                      "domain": domain(site.get("url", "")),
+                      "url": site.get("url"),
+                      "reason": "dead_site",
+                      "rejected_at": date.today().isoformat(),
+                      "cooldown_until": f"{date.today().year}-12-31",
+                      "notes": f"auto from health fail_streak={fails.get(sid)} id={sid}",
+                  })
+                  print(f"[graveyard] {sid} dead_site")
+                  fails.pop(sid, None)
+                  changed = True
+              else:
+                  remain.append(site)
+          sites = remain
+
+          # --- Promotion / demotion STUB (rules documented in README) ---
+          # logs/*.jsonl are append-only from local Skill pushes.
+          # Full ranking needs richer history; this stub only prints candidates.
+          # Promotion: candidate with >=3 hits in last 30 days AND kind has seat → core
+          # Demotion: core with 0 hits in 60 days AND kind over-quota → graveyard low_signal
+          from collections import Counter
+          hit_counter: Counter[str] = Counter()
+          log_dir = ROOT / "logs"
+          if log_dir.exists():
+              for p in sorted(log_dir.glob("*.jsonl")):
+                  for line in p.read_text(encoding="utf-8").splitlines():
+                      line = line.strip()
+                      if not line:
+                          continue
+                      try:
+                          rec = json.loads(line)
+                      except json.JSONDecodeError:
+                          continue
+                      for h in rec.get("hits") or []:
+                          hit_counter[h] += 1
+          print("[stub] hit_counter top:", hit_counter.most_common(10))
+          print("[stub] promotion/demotion not auto-applied yet; see README")
+
+          if changed:
+              save_yaml(SITES, sites)
+              if gy_wrap:
+                  save_yaml(GRAVEYARD, {"sites": gy_sites})
+              else:
+                  save_yaml(GRAVEYARD, {"sites": gy_sites})
+
+          STATE.write_text(
+              json.dumps({"fail_streak": fails, "updated": date.today().isoformat()}, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          print("health probe done")
+          PY
+
+      - name: Refresh STATUS.md
+        run: python scripts/triage.py refresh-status
+
+      - name: Commit health updates
+        run: |
+          set -euo pipefail
+          git config user.name "design-pool-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add sites.yaml graveyard.yaml STATUS.md .health-state.json || true
+          # Do NOT amend logs/ here — logs are append-only from local agents.
+          if git diff --cached --quiet; then
+            echo "No health changes"
+          else
+            git commit -m "chore(health): weekly probe, heal, STATUS refresh"
+            git pull --rebase origin main || true
+            git push origin HEAD:main
+          fi
