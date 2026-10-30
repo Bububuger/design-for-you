@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""design-pool triage: URL normalize, dup/graveyard check, loose gallery gate,
+"""design-for-you triage: URL normalize, dup/graveyard check, loose gallery gate,
 optional LLM covers, STATUS.md generation. Shared by local Skill and Actions.
 """
 
@@ -57,7 +57,7 @@ GALLERY_HINT_WORDS = re.compile(
 )
 
 USER_AGENT = (
-    "design-pool-triage/1.0 (+https://github.com/Bububuger/design-pool; research)"
+    "design-for-you-triage/1.0 (+https://github.com/Bububuger/design-for-you; research)"
 )
 
 
@@ -397,7 +397,7 @@ def generate_status_md(
     counts = seat_counts()
     by = counts["by_kind"]
     lines = [
-        "# design-pool 缺口悬赏单",
+        "# Design For You 缺口悬赏单",
         "",
         f"> 自动生成于 {date.today().isoformat()}。",
     ]
@@ -679,7 +679,7 @@ def cmd_inbox_from_env() -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="design-pool triage")
+    p = argparse.ArgumentParser(description="design-for-you triage")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     t = sub.add_parser("triage", help="Triage one URL")
