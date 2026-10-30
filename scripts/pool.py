@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""design-pool local helpers: 4 Core + 1 Candidate select, log receipts,
+"""design-for-you local helpers: 4 Core + 1 Candidate select, log receipts,
 Chrome bookmark diff stub.
 """
 
@@ -236,7 +236,7 @@ def scan_chrome_bookmarks_diff(
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="design-pool local pool helpers")
+    p = argparse.ArgumentParser(description="design-for-you local pool helpers")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     s = sub.add_parser("select", help="Select up to 4 core + 1 candidate")

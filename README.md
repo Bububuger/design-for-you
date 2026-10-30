@@ -1,4 +1,4 @@
-# design-pool
+# Design For You
 
 为本地技能 `/find-design-for-this` 维护的**设计灵感站点池**。结构化清单 + 席位制 + Issue 投喂闭环，替代「只靠 Chrome 书签字符串匹配」。
 
