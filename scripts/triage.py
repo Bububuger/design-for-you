@@ -143,8 +143,37 @@ def save_graveyard(entries: list[dict]) -> None:
     save_yaml(GRAVEYARD_PATH, {"sites": entries})
 
 
+def github_repo_key(url: str) -> str | None:
+    """Normalize github.com / www.github.com URLs to owner/repo (lower, no .git)."""
+    raw = (url or "").strip()
+    if not raw:
+        return None
+    if "://" not in raw:
+        raw = "https://" + raw
+    parsed = urlparse(raw)
+    host = parsed.netloc.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    if host != "github.com":
+        return None
+    parts = [p for p in parsed.path.strip("/").split("/") if p]
+    if len(parts) < 2:
+        return None
+    owner = parts[0].lower()
+    repo = parts[1].lower()
+    if repo.endswith(".git"):
+        repo = repo[: -len(".git")]
+    return f"{owner}/{repo}"
+
+
 def urls_match(a: str, b: str) -> bool:
-    return domain_of(a) == domain_of(b) or a.rstrip("/") == b.rstrip("/")
+    if a.rstrip("/") == b.rstrip("/"):
+        return True
+    ga, gb = github_repo_key(a), github_repo_key(b)
+    # Any github.com URL: match only by owner/repo, never by bare domain.
+    if ga is not None or gb is not None:
+        return ga is not None and gb is not None and ga == gb
+    return domain_of(a) == domain_of(b)
 
 
 def find_duplicate(url: str) -> dict | None:
@@ -156,11 +185,15 @@ def find_duplicate(url: str) -> dict | None:
             if urls_match(url, alias):
                 return {"where": "sites", "id": site.get("id"), "status": site.get("status")}
     for g in list_graveyard():
-        gd = g.get("domain") or domain_of(g.get("url", ""))
-        if gd and gd == d:
-            return {"where": "graveyard", "reason": g.get("reason"), "entry": g}
         if g.get("url") and urls_match(url, g["url"]):
             return {"where": "graveyard", "reason": g.get("reason"), "entry": g}
+        gd = g.get("domain") or domain_of(g.get("url", "") or "")
+        if not gd or gd != d:
+            continue
+        # github.com domain alone must not collide every repo; need URL key.
+        if gd in ("github.com", "www.github.com"):
+            continue
+        return {"where": "graveyard", "reason": g.get("reason"), "entry": g}
     return None
 
 
