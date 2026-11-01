@@ -484,3 +484,17 @@
   search_hint: "公司官方一手 DESIGN.md；与 awesome-design-md 互补，勿合并"
   auth: none
   added_at: "2026-10-30"
+- id: uxpatterns-empty-states
+  name: UX Patterns — Empty States
+  url: https://uxpatterns.dev/patterns/user-feedback/empty-states
+  aliases: []
+  status: candidate
+  kind: component
+  covers:
+  - empty-state
+  - skeleton
+  - loading
+  - user-feedback
+  search_hint: 浏览 empty-state / 空状态、骨架屏与加载态等用户反馈 UX 模式文档
+  auth: none
+  added_at: '2026-11-01'

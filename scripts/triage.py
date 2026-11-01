@@ -275,8 +275,85 @@ def loose_gallery_gate(html: str, url: str) -> dict:
     }
 
 
+# Contrastive / negated mentions of landing — must not set kind=landing (#14 FP).
+NEGATED_LANDING_RE = re.compile(
+    r"(?:"
+    r"不是(?:又一个|一个|单纯的?|普通的?)?.{0,16}(?:落地页|landing(?:\s*pages?)?)"
+    r"|并非.{0,16}(?:落地页|landing(?:\s*pages?)?)"
+    r"|而非.{0,16}(?:落地页|landing(?:\s*pages?)?)"
+    r"|别把.{0,20}(?:当|成).{0,10}(?:落地页|landing(?:\s*pages?)?)"
+    r"|不要(?:把)?.{0,16}(?:当|成).{0,10}(?:落地页|landing(?:\s*pages?)?)"
+    r"|别当.{0,10}(?:落地页|landing(?:\s*pages?)?)"
+    r"|not\s+(?:just\s+)?(?:another\s+)?(?:a\s+)?landing(?:\s*pages?)?"
+    r"|isn'?t\s+(?:just\s+)?(?:another\s+)?(?:a\s+)?landing(?:\s*pages?)?"
+    r"|rather\s+than\s+(?:a\s+)?(?:ordinary\s+)?landing(?:\s*pages?)?"
+    r")",
+    re.I,
+)
+
+# Positive gallery/marketing signals only (avoid bare "landing" / negated 落地页).
+LANDING_POSITIVE_KEYS = (
+    "落地页画廊",
+    "落地页合集",
+    "落地页灵感",
+    "落地页陈列",
+    "落地页站点",
+    "营销落地页",
+    "landing page gallery",
+    "landing pages gallery",
+    "landing page showcase",
+    "landing pages showcase",
+    "landing gallery",
+    "landing showcase",
+    "landing page inspiration",
+    "marketing landing",
+    "landing pages",
+    "landing page",
+    "落地页",
+)
+
+EXPLICIT_KIND_RE = re.compile(
+    r"(?:^|\n)\s*kind\s*[:=]\s*(product-flow|component|landing|system)\b",
+    re.I,
+)
+EXPLICIT_COVERS_RE = re.compile(
+    r"(?:^|\n)\s*covers\s*[:=]\s*\[?([^\n\]]+)\]?",
+    re.I,
+)
+VALID_KINDS = frozenset({"product-flow", "component", "landing", "system"})
+
+
+def scrub_negated_landing_mentions(text: str) -> str:
+    """Remove contrastive spans so 落地页 inside 不是…落地页… does not match."""
+    return NEGATED_LANDING_RE.sub(" ", text or "")
+
+
+def parse_explicit_labels(reason: str) -> dict[str, Any]:
+    """Honor an explicit kind/covers block in the issue body when present."""
+    out: dict[str, Any] = {}
+    if not reason:
+        return out
+    km = EXPLICIT_KIND_RE.search(reason)
+    if km:
+        kind = km.group(1).lower()
+        if kind in VALID_KINDS:
+            out["kind"] = kind
+    cm = EXPLICIT_COVERS_RE.search(reason)
+    if cm:
+        raw = cm.group(1).strip().strip("[]")
+        covers = [
+            c.strip().strip("'\"")
+            for c in re.split(r"[,，、]", raw)
+            if c.strip().strip("'\"")
+        ]
+        if covers:
+            out["covers"] = covers
+    return out
+
+
 def rule_covers_from_text(text: str, reason: str = "") -> list[str]:
     blob = f"{text}\n{reason}".lower()
+    landing_blob = scrub_negated_landing_mentions(blob)
     lexicon = {
         "data-table": ["data table", "datatable", "表格", "table"],
         "filter-builder": ["filter builder", "query builder", "筛选"],
@@ -288,7 +365,6 @@ def rule_covers_from_text(text: str, reason: str = "") -> list[str]:
         "skeleton": ["skeleton", "loading"],
         "chat": ["chat", "message"],
         "agent-flow": ["agent", "tool call", "approval"],
-        "landing-page": ["landing", "落地页"],
         "bento-grid": ["bento"],
         "navbar": ["navbar", "header", "navigation"],
         "footer": ["footer", "页脚"],
@@ -299,11 +375,15 @@ def rule_covers_from_text(text: str, reason: str = "") -> list[str]:
         "dialog": ["dialog", "modal"],
         "sidebar": ["sidebar"],
         "command-palette": ["command palette", "cmdk"],
+        "user-feedback": ["user-feedback", "user feedback", "用户反馈"],
     }
     found: list[str] = []
     for tag, keys in lexicon.items():
         if any(k in blob for k in keys):
             found.append(tag)
+    # landing-page: scrub negations first; match positive/gallery-oriented keys only
+    if any(k in landing_blob for k in LANDING_POSITIVE_KEYS):
+        found.append("landing-page")
     return found[:12]
 
 
@@ -531,6 +611,7 @@ def triage_url(
     auth = auth_hint or "none"
     result["auth"] = auth
 
+    explicit = parse_explicit_labels(reason)
     llm = llm_covers_and_hint(result["url"], html[:8000], reason)
     if llm:
         covers = list(llm.get("covers") or [])
@@ -551,23 +632,36 @@ def triage_url(
         ):
             kind = "product-flow"
         result["label_source"] = "rules"
-        if not covers:
-            result["decision"] = "needs_human"
-            result["note"] = "weak_covers_no_llm"
-            # still attach draft for human
-            result["draft"] = {
-                "id": slug_id(result["url"], name),
-                "name": name or domain_of(result["url"]),
-                "url": result["url"],
-                "aliases": [],
-                "status": "candidate",
-                "kind": kind,
-                "covers": covers,
-                "search_hint": search_hint,
-                "auth": auth,
-                "added_at": date.today().isoformat(),
-            }
-            return result
+
+    # Explicit issue-body kind/covers win over rules (and fill gaps for LLM).
+    if explicit.get("covers"):
+        # Prefer explicit list; keep any extra rule tags that do not contradict.
+        merged: list[str] = []
+        for c in list(explicit["covers"]) + list(covers):
+            if c not in merged:
+                merged.append(c)
+        covers = merged[:12]
+    if explicit.get("kind"):
+        kind = explicit["kind"]
+        result["explicit_kind"] = True
+
+    if result.get("label_source") == "rules" and not covers:
+        result["decision"] = "needs_human"
+        result["note"] = "weak_covers_no_llm"
+        # still attach draft for human
+        result["draft"] = {
+            "id": slug_id(result["url"], name),
+            "name": name or domain_of(result["url"]),
+            "url": result["url"],
+            "aliases": [],
+            "status": "candidate",
+            "kind": kind,
+            "covers": covers,
+            "search_hint": search_hint,
+            "auth": auth,
+            "added_at": date.today().isoformat(),
+        }
+        return result
 
     if kind == "landing":
         result["decision"] = "rejected_landing_freeze"

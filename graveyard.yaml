@@ -1,7 +1,1 @@
-sites:
-- domain: uxpatterns.dev
-  url: https://uxpatterns.dev/patterns/user-feedback/empty-states
-  reason: landing_freeze
-  rejected_at: '2026-10-30'
-  cooldown_until: '2026-12-31'
-  notes: ordinary landing frozen at intake
+sites: []
