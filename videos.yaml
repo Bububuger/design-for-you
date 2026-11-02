@@ -45,3 +45,27 @@
     外链学习参考，勿当免版权素材再分发。'
   auth: none
   added_at: '2026-11-02'
+- id: screensdesign
+  name: screensdesign.com
+  url: https://screensdesign.com/
+  aliases: []
+  status: candidate
+  kind: ui-motion
+  covers:
+  - ui-motion
+  - app-flow
+  - screen-recording
+  - onboarding
+  - micro-interaction
+  search_hint: 'track: video
+
+    kind: ui-motion
+
+    covers: ui-motion, app-flow, screen-recording
+
+
+    App 流程录屏（偏 UI 旅程），作视频轨动效/流程刷库。
+
+    外链学习参考，勿当免版权素材再分发。'
+  auth: none
+  added_at: '2026-11-02'
