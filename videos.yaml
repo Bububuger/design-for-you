@@ -96,3 +96,28 @@
     外链学习参考，勿当免版权素材再分发。'
   auth: none
   added_at: '2026-11-02'
+- id: refs
+  name: refs.video
+  url: https://refs.video/archive?c=demo
+  aliases: []
+  status: candidate
+  kind: storyboard
+  covers:
+  - storyboard
+  - demo-archive
+  - beat
+  - data-table
+  - billing
+  - micro-interaction
+  search_hint: 'track: video
+
+    kind: storyboard
+
+    covers: storyboard, demo-archive, beat
+
+
+    Demo 向 refs 归档，分镜/节拍参考。
+
+    外链学习参考，勿当免版权素材再分发。'
+  auth: none
+  added_at: '2026-11-02'
