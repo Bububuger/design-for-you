@@ -22,3 +22,26 @@
     外链学习参考，勿当免版权素材再分发。'
   auth: none
   added_at: '2026-11-02'
+- id: drama
+  name: drama.so
+  url: https://drama.so/prompts
+  aliases: []
+  status: candidate
+  kind: gen-style
+  covers:
+  - gen-style
+  - prompt
+  - drama
+  - dialog
+  search_hint: 'track: video
+
+    kind: gen-style
+
+    covers: gen-style, prompt, drama
+
+
+    生成抄风格 prompt 库。
+
+    外链学习参考，勿当免版权素材再分发。'
+  auth: none
+  added_at: '2026-11-02'
