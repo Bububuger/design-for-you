@@ -21,9 +21,11 @@ from bs4 import BeautifulSoup
 
 ROOT = Path(__file__).resolve().parents[1]
 SITES_PATH = ROOT / "sites.yaml"
+VIDEOS_PATH = ROOT / "videos.yaml"
 GRAVEYARD_PATH = ROOT / "graveyard.yaml"
 STATUS_PATH = ROOT / "STATUS.md"
 
+# Web track
 SEAT_QUOTAS = {
     "product-flow": 10,
     "component": 12,
@@ -32,6 +34,18 @@ SEAT_QUOTAS = {
 }
 CANDIDATE_CAP = 20
 CORE_CAP = 30
+VALID_KINDS = frozenset({"product-flow", "component", "landing", "system"})
+
+# Video track (independent seats; does not compete with web)
+VIDEO_KINDS = frozenset({"ui-motion", "launch-demo", "storyboard", "gen-style"})
+VIDEO_SEAT_QUOTAS = {
+    "ui-motion": 4,
+    "launch-demo": 6,
+    "storyboard": 4,
+    "gen-style": 4,
+}
+VIDEO_CANDIDATE_CAP = 12
+VIDEO_CORE_CAP = 18
 
 STRIP_QUERY_KEYS = {
     "utm_source",
@@ -130,6 +144,19 @@ def list_sites() -> list[dict]:
     return data if isinstance(data, list) else []
 
 
+def list_videos() -> list[dict]:
+    data = load_yaml(VIDEOS_PATH)
+    return data if isinstance(data, list) else []
+
+
+def list_pool(track: str = "web") -> list[dict]:
+    return list_videos() if track == "video" else list_sites()
+
+
+def pool_path(track: str = "web") -> Path:
+    return VIDEOS_PATH if track == "video" else SITES_PATH
+
+
 def list_graveyard() -> list[dict]:
     data = load_yaml(GRAVEYARD_PATH)
     if isinstance(data, dict):
@@ -176,14 +203,39 @@ def urls_match(a: str, b: str) -> bool:
     return domain_of(a) == domain_of(b)
 
 
-def find_duplicate(url: str) -> dict | None:
-    d = domain_of(url)
-    for site in list_sites():
+def _dup_in_pool(url: str, sites: list[dict], where: str) -> dict | None:
+    for site in sites:
         if urls_match(url, site.get("url", "")):
-            return {"where": "sites", "id": site.get("id"), "status": site.get("status")}
+            return {
+                "where": where,
+                "id": site.get("id"),
+                "status": site.get("status"),
+                "track": "video" if where == "videos" else "web",
+            }
         for alias in site.get("aliases") or []:
             if urls_match(url, alias):
-                return {"where": "sites", "id": site.get("id"), "status": site.get("status")}
+                return {
+                    "where": where,
+                    "id": site.get("id"),
+                    "status": site.get("status"),
+                    "track": "video" if where == "videos" else "web",
+                }
+    return None
+
+
+def find_duplicate(url: str, track: str | None = None) -> dict | None:
+    """Check pool(s) + shared graveyard. Prefer same-track pool first when track set."""
+    d = domain_of(url)
+    if track == "video":
+        order = [("videos", list_videos()), ("sites", list_sites())]
+    elif track == "web":
+        order = [("sites", list_sites()), ("videos", list_videos())]
+    else:
+        order = [("sites", list_sites()), ("videos", list_videos())]
+    for where, sites in order:
+        hit = _dup_in_pool(url, sites, where)
+        if hit:
+            return hit
     for g in list_graveyard():
         if g.get("url") and urls_match(url, g["url"]):
             return {"where": "graveyard", "reason": g.get("reason"), "entry": g}
@@ -313,14 +365,28 @@ LANDING_POSITIVE_KEYS = (
 )
 
 EXPLICIT_KIND_RE = re.compile(
-    r"(?:^|\n)\s*kind\s*[:=]\s*(product-flow|component|landing|system)\b",
+    r"(?:^|\n)\s*kind\s*[:=]\s*([a-z0-9-]+)\b",
+    re.I,
+)
+EXPLICIT_TRACK_RE = re.compile(
+    r"(?:^|\n)\s*track\s*[:=]\s*(web|video)\b",
     re.I,
 )
 EXPLICIT_COVERS_RE = re.compile(
     r"(?:^|\n)\s*covers\s*[:=]\s*\[?([^\n\]]+)\]?",
     re.I,
 )
-VALID_KINDS = frozenset({"product-flow", "component", "landing", "system"})
+EXPLICIT_LICENSE_NOTE_RE = re.compile(
+    r"(?:^|\n)\s*license_note\s*[:=]\s*(.+)$",
+    re.I | re.M,
+)
+
+VIDEO_KIND_HINTS = {
+    "launch-demo": ["launch-demo", "launch demo", "product launch", "发布视频", "演示视频", "demo reel"],
+    "storyboard": ["storyboard", "分镜", "叙事", "narrative board"],
+    "gen-style": ["gen-style", "gen style", "sora", "runway", "kling", "生成视频", "生成风格"],
+    "ui-motion": ["ui-motion", "ui motion", "micro-interaction", "动效", "motion design", "interface animation"],
+}
 
 
 def scrub_negated_landing_mentions(text: str) -> str:
@@ -328,15 +394,26 @@ def scrub_negated_landing_mentions(text: str) -> str:
     return NEGATED_LANDING_RE.sub(" ", text or "")
 
 
-def parse_explicit_labels(reason: str) -> dict[str, Any]:
-    """Honor an explicit kind/covers block in the issue body when present."""
+def kinds_for_track(track: str) -> frozenset[str]:
+    return VIDEO_KINDS if track == "video" else VALID_KINDS
+
+
+def parse_explicit_labels(reason: str, track: str | None = None) -> dict[str, Any]:
+    """Honor explicit track/kind/covers/license_note in the issue body when present."""
     out: dict[str, Any] = {}
     if not reason:
         return out
+    tm = EXPLICIT_TRACK_RE.search(reason)
+    if tm:
+        out["track"] = tm.group(1).lower()
+    resolved_track = (track or out.get("track") or "web").lower()
+    if resolved_track not in ("web", "video"):
+        resolved_track = "web"
+    allowed = kinds_for_track(resolved_track)
     km = EXPLICIT_KIND_RE.search(reason)
     if km:
         kind = km.group(1).lower()
-        if kind in VALID_KINDS:
+        if kind in allowed:
             out["kind"] = kind
     cm = EXPLICIT_COVERS_RE.search(reason)
     if cm:
@@ -348,7 +425,20 @@ def parse_explicit_labels(reason: str) -> dict[str, Any]:
         ]
         if covers:
             out["covers"] = covers
+    lm = EXPLICIT_LICENSE_NOTE_RE.search(reason)
+    if lm:
+        note = lm.group(1).strip().strip("'\"")
+        if note:
+            out["license_note"] = note
     return out
+
+
+def rule_video_kind_from_text(text: str, reason: str = "") -> str:
+    blob = f"{text}\n{reason}".lower()
+    for kind, keys in VIDEO_KIND_HINTS.items():
+        if any(k in blob for k in keys):
+            return kind
+    return "ui-motion"
 
 
 def rule_covers_from_text(text: str, reason: str = "") -> list[str]:
@@ -388,21 +478,34 @@ def rule_covers_from_text(text: str, reason: str = "") -> list[str]:
 
 
 def llm_covers_and_hint(
-    url: str, html_snippet: str, reason: str
+    url: str, html_snippet: str, reason: str, track: str = "web"
 ) -> dict | None:
     """Optional LLM assist. Returns None if no key / failure → caller falls back."""
     openai_key = os.environ.get("OPENAI_API_KEY")
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
+    if track == "video":
+        kind_line = (
+            "kind (one of ui-motion|launch-demo|storyboard|gen-style).\n"
+            "Prefer launch-demo for product launch/demo reels, ui-motion for UI animation, "
+            "storyboard for narrative boards, gen-style for generative video style refs."
+        )
+        role = "video-inspiration libraries / demo reels for a retrieval pool"
+    else:
+        kind_line = (
+            "kind (one of product-flow|component|landing|system).\n"
+            "If this is a plain marketing landing for a single product (not a multi-case "
+            "gallery), set covers to [] and kind to landing."
+        )
+        role = "design-inspiration gallery sites for a retrieval pool"
     prompt = (
-        "You label design-inspiration gallery sites for a retrieval pool.\n"
+        f"You label {role}.\n"
         f"URL: {url}\n"
+        f"Track: {track}\n"
         f"Submitter reason: {reason}\n"
         f"HTML/text snippet:\n{html_snippet[:6000]}\n\n"
         "Reply JSON only with keys: covers (array of short kebab-case tags), "
         "search_hint (one Chinese or English sentence on how to search in-site), "
-        "kind (one of product-flow|component|landing|system).\n"
-        "If this is a plain marketing landing for a single product (not a multi-case "
-        "gallery), set covers to [] and kind to landing."
+        f"{kind_line}"
     )
 
     try:
@@ -455,44 +558,35 @@ def slug_id(url: str, name: str | None = None) -> str:
     return re.sub(r"[^a-z0-9]+", "-", host.lower()).strip("-")[:48] or "site"
 
 
-def seat_counts(sites: list[dict] | None = None) -> dict:
-    sites = sites if sites is not None else list_sites()
+def seat_counts(sites: list[dict] | None = None, track: str = "web") -> dict:
+    track = "video" if track == "video" else "web"
+    if sites is None:
+        sites = list_pool(track)
+    quotas = VIDEO_SEAT_QUOTAS if track == "video" else SEAT_QUOTAS
+    default_kind = "ui-motion" if track == "video" else "component"
     core = [s for s in sites if s.get("status") == "core"]
     cand = [s for s in sites if s.get("status") == "candidate"]
-    by_kind: dict[str, int] = {k: 0 for k in SEAT_QUOTAS}
+    by_kind: dict[str, int] = {k: 0 for k in quotas}
     for s in core:
-        k = s.get("kind") or "component"
+        k = s.get("kind") or default_kind
         by_kind[k] = by_kind.get(k, 0) + 1
     return {
+        "track": track,
         "core_total": len(core),
         "candidate_total": len(cand),
         "by_kind": by_kind,
+        "candidate_cap": VIDEO_CANDIDATE_CAP if track == "video" else CANDIDATE_CAP,
+        "core_cap": VIDEO_CORE_CAP if track == "video" else CORE_CAP,
     }
 
 
-def generate_status_md(
-    miss_terms: list[str] | None = None,
-    freeze_landing: bool = True,
-) -> str:
-    counts = seat_counts()
+def _seat_table_rows(counts: dict, quotas: dict[str, int], core_cap: int, cand_cap: int) -> list[str]:
     by = counts["by_kind"]
-    lines = [
-        "# Design For You 缺口悬赏单",
-        "",
-        f"> 自动生成于 {date.today().isoformat()}。",
-    ]
-    if freeze_landing:
-        lines.append(
-            "> **暂不接收普通 `landing`（整站/营销落地页）新站。** landing 席位已超配或接近满席，冻结新增。"
-        )
-    lines += [
-        "",
-        "## 席位余量（Core）",
-        "",
+    lines: list[str] = [
         "| 分类 | 配额 | 已用 | 余量 | 状态 |",
         "| :--- | ---: | ---: | ---: | :--- |",
     ]
-    for kind, quota in SEAT_QUOTAS.items():
+    for kind, quota in quotas.items():
         used = by.get(kind, 0)
         rem = quota - used
         if rem < 0:
@@ -504,14 +598,46 @@ def generate_status_md(
         rem_s = f"**{rem}**" if rem < 0 else str(rem)
         lines.append(f"| {kind} | {quota} | {used} | {rem_s} | {status} |")
     lines += [
-        f"| **Core 合计** | **≤{CORE_CAP}** | **{counts['core_total']}** | — | — |",
-        f"| candidate 池 | {CANDIDATE_CAP} | {counts['candidate_total']} | "
-        f"{CANDIDATE_CAP - counts['candidate_total']} | "
-        f"{'有空位' if counts['candidate_total'] < CANDIDATE_CAP else '满'} |",
+        f"| **Core 合计** | **≤{core_cap}** | **{counts['core_total']}** | — | — |",
+        f"| candidate 池 | {cand_cap} | {counts['candidate_total']} | "
+        f"{cand_cap - counts['candidate_total']} | "
+        f"{'有空位' if counts['candidate_total'] < cand_cap else '满'} |",
+    ]
+    return lines
+
+
+def generate_status_md(
+    miss_terms: list[str] | None = None,
+    freeze_landing: bool = True,
+) -> str:
+    web = seat_counts(track="web")
+    video = seat_counts(track="video")
+    lines = [
+        "# Design For You 缺口悬赏单",
         "",
-        "## 首期定向悬赏（高优）",
+        f"> 自动生成于 {date.today().isoformat()}。",
+    ]
+    if freeze_landing:
+        lines.append(
+            "> **暂不接收普通 `landing`（整站/营销落地页）新站。** landing 席位已超配或接近满席，冻结新增（仅 Web 轨）。"
+        )
+    lines += [
         "",
-        "投喂：Issue 标题=URL，标签=`inbox`，正文=原因/`covers`。",
+        "## Web 席位余量（Core）",
+        "",
+    ]
+    lines += _seat_table_rows(web, SEAT_QUOTAS, CORE_CAP, CANDIDATE_CAP)
+    lines += [
+        "",
+        "## Video 席位余量（Core）",
+        "",
+    ]
+    lines += _seat_table_rows(video, VIDEO_SEAT_QUOTAS, VIDEO_CORE_CAP, VIDEO_CANDIDATE_CAP)
+    lines += [
+        "",
+        "## 首期定向悬赏（高优 · Web）",
+        "",
+        "投喂：Issue 标题=URL，标签=`inbox`，正文=原因/`covers`（默认 `track: web`）。",
         "",
         "### 1. B2B / SaaS 数据密集型界面库",
         "",
@@ -528,6 +654,15 @@ def generate_status_md(
         "### 4. AI / Agent 原生交互实录",
         "",
         "缺：多步审批、Diff 审阅、引用溯源、Canvas / Artifact 动线。",
+        "",
+        "## 视频轨悬赏（简）",
+        "",
+        "投喂：Issue 正文加 `track: video` 与 `kind: launch-demo|ui-motion|storyboard|gen-style`。",
+        "",
+        "- **launch-demo**：产品发布 / demo 成片灵感（席位余量见上表）",
+        "- **ui-motion**：界面动效 / micro-interaction 实录",
+        "- **storyboard**：分镜 / 叙事结构参考",
+        "- **gen-style**：生成视频风格参考",
         "",
         "## 近期未命中交互词",
         "",
@@ -561,15 +696,44 @@ def add_to_graveyard(url: str, reason: str, notes: str = "") -> None:
     save_graveyard(entries)
 
 
-def add_candidate(entry: dict) -> None:
-    sites = list_sites()
-    if seat_counts(sites)["candidate_total"] >= CANDIDATE_CAP:
-        raise RuntimeError("candidate pool full")
-    # landing freeze for new submissions
-    if entry.get("kind") == "landing":
+def add_candidate(entry: dict, track: str = "web") -> None:
+    track = "video" if track == "video" else "web"
+    sites = list_pool(track)
+    counts = seat_counts(sites, track=track)
+    cand_cap = counts["candidate_cap"]
+    if counts["candidate_total"] >= cand_cap:
+        raise RuntimeError(f"{track} candidate pool full")
+    # landing freeze is web-only
+    if track == "web" and entry.get("kind") == "landing":
         raise RuntimeError("landing submissions frozen; refuse ordinary landing")
     sites.append(entry)
-    save_yaml(SITES_PATH, sites)
+    save_yaml(pool_path(track), sites)
+
+
+def _draft_entry(
+    url: str,
+    name: str | None,
+    kind: str,
+    covers: list[str],
+    search_hint: str,
+    auth: str,
+    license_note: str | None = None,
+) -> dict:
+    entry: dict[str, Any] = {
+        "id": slug_id(url, name),
+        "name": name or domain_of(url),
+        "url": url,
+        "aliases": [],
+        "status": "candidate",
+        "kind": kind,
+        "covers": covers,
+        "search_hint": search_hint,
+        "auth": auth,
+        "added_at": date.today().isoformat(),
+    }
+    if license_note:
+        entry["license_note"] = license_note
+    return entry
 
 
 def triage_url(
@@ -578,6 +742,7 @@ def triage_url(
     name: str | None = None,
     auth_hint: str | None = None,
     write: bool = False,
+    track: str | None = None,
 ) -> dict:
     result: dict[str, Any] = {"input_url": url, "reason": reason}
     try:
@@ -587,7 +752,15 @@ def triage_url(
         result["normalize_error"] = str(e)
     result["url"] = normalized
 
-    dup = find_duplicate(normalized)
+    # Resolve track early (explicit CLI/arg wins; else issue body; default web).
+    explicit_early = parse_explicit_labels(reason)
+    resolved_track = (track or explicit_early.get("track") or "web").lower()
+    if resolved_track not in ("web", "video"):
+        resolved_track = "web"
+    result["track"] = resolved_track
+    allowed_kinds = kinds_for_track(resolved_track)
+
+    dup = find_duplicate(normalized, track=resolved_track)
     if dup:
         result["decision"] = "duplicate"
         result["duplicate"] = dup
@@ -611,13 +784,39 @@ def triage_url(
     auth = auth_hint or "none"
     result["auth"] = auth
 
-    explicit = parse_explicit_labels(reason)
-    llm = llm_covers_and_hint(result["url"], html[:8000], reason)
+    explicit = parse_explicit_labels(reason, track=resolved_track)
+    license_note = explicit.get("license_note")
+    llm = llm_covers_and_hint(
+        result["url"], html[:8000], reason, track=resolved_track
+    )
     if llm:
         covers = list(llm.get("covers") or [])
         search_hint = llm.get("search_hint") or reason or "浏览画廊"
-        kind = llm.get("kind") or "component"
+        kind = llm.get("kind") or (
+            "ui-motion" if resolved_track == "video" else "component"
+        )
+        if kind not in allowed_kinds:
+            kind = (
+                rule_video_kind_from_text(html[:4000], reason)
+                if resolved_track == "video"
+                else "component"
+            )
         result["label_source"] = "llm"
+    elif resolved_track == "video":
+        covers = rule_covers_from_text(html[:4000], reason)
+        # Soft video tags from reason/html when rules lexicon is sparse
+        for tag, keys in (
+            ("launch-demo", VIDEO_KIND_HINTS["launch-demo"]),
+            ("ui-motion", VIDEO_KIND_HINTS["ui-motion"]),
+            ("storyboard", VIDEO_KIND_HINTS["storyboard"]),
+            ("gen-style", VIDEO_KIND_HINTS["gen-style"]),
+        ):
+            blob = f"{html[:2000]}\n{reason}".lower()
+            if any(k in blob for k in keys) and tag not in covers:
+                covers.append(tag)
+        search_hint = reason.strip() or "浏览视频灵感库并按风格/动效筛选"
+        kind = rule_video_kind_from_text(html[:4000], reason)
+        result["label_source"] = "rules"
     else:
         covers = rule_covers_from_text(html[:4000], reason)
         search_hint = reason.strip() or "浏览画廊并按标签/搜索筛选"
@@ -644,26 +843,20 @@ def triage_url(
     if explicit.get("kind"):
         kind = explicit["kind"]
         result["explicit_kind"] = True
+    if kind not in allowed_kinds:
+        kind = "ui-motion" if resolved_track == "video" else "component"
 
     if result.get("label_source") == "rules" and not covers:
         result["decision"] = "needs_human"
         result["note"] = "weak_covers_no_llm"
         # still attach draft for human
-        result["draft"] = {
-            "id": slug_id(result["url"], name),
-            "name": name or domain_of(result["url"]),
-            "url": result["url"],
-            "aliases": [],
-            "status": "candidate",
-            "kind": kind,
-            "covers": covers,
-            "search_hint": search_hint,
-            "auth": auth,
-            "added_at": date.today().isoformat(),
-        }
+        result["draft"] = _draft_entry(
+            result["url"], name, kind, covers, search_hint, auth, license_note
+        )
         return result
 
-    if kind == "landing":
+    # Landing freeze applies to web track only.
+    if resolved_track == "web" and kind == "landing":
         result["decision"] = "rejected_landing_freeze"
         if write:
             add_to_graveyard(
@@ -676,39 +869,21 @@ def triage_url(
     if gate["verdict"] == "needs_human" and result.get("label_source") == "rules":
         # Keep human path unless LLM + strong score
         result["decision"] = "needs_human"
-        result["draft"] = {
-            "id": slug_id(result["url"], name),
-            "name": name or domain_of(result["url"]),
-            "url": result["url"],
-            "aliases": [],
-            "status": "candidate",
-            "kind": kind,
-            "covers": covers,
-            "search_hint": search_hint,
-            "auth": auth,
-            "added_at": date.today().isoformat(),
-        }
+        result["draft"] = _draft_entry(
+            result["url"], name, kind, covers, search_hint, auth, license_note
+        )
         return result
 
-    entry = {
-        "id": slug_id(result["url"], name),
-        "name": name or domain_of(result["url"]),
-        "url": result["url"],
-        "aliases": [],
-        "status": "candidate",
-        "kind": kind,
-        "covers": covers,
-        "search_hint": search_hint,
-        "auth": auth,
-        "added_at": date.today().isoformat(),
-    }
+    entry = _draft_entry(
+        result["url"], name, kind, covers, search_hint, auth, license_note
+    )
     result["entry"] = entry
 
     if gate["verdict"] == "pass" or result.get("label_source") == "llm":
         result["decision"] = "accept_candidate"
         if write:
             try:
-                add_candidate(entry)
+                add_candidate(entry, track=resolved_track)
                 refresh_status()
             except RuntimeError as e:
                 result["decision"] = "needs_human"
@@ -743,9 +918,11 @@ def cmd_inbox_from_env() -> int:
 
     result = triage_url(url, reason=body, write=True)
     decision = result.get("decision")
+    track = result.get("track") or "web"
     if decision == "accept_candidate":
         comment = (
-            f"✅ 已入 **candidate**：`{result['entry']['id']}`\n"
+            f"✅ 已入 **{track} candidate**：`{result['entry']['id']}`\n"
+            f"- track: {track}\n"
             f"- url: {result['entry']['url']}\n"
             f"- kind: {result['entry']['kind']}\n"
             f"- covers: {', '.join(result['entry'].get('covers') or [])}\n"
@@ -754,11 +931,14 @@ def cmd_inbox_from_env() -> int:
     elif decision == "duplicate":
         comment = f"⏭️ 重复：已在池或墓碑中 — `{result.get('duplicate')}`"
     elif decision == "rejected_landing_freeze":
-        comment = "🚫 当前冻结普通 landing 新站（见 STATUS.md）。已记入 graveyard（landing_freeze）。"
+        comment = "🚫 当前冻结普通 landing 新站（Web 轨；见 STATUS.md）。已记入 graveyard（landing_freeze）。"
     elif decision == "needs_human":
+        write_err = result.get("write_error")
+        extra = f"\n- write_error: {write_err}" if write_err else ""
         comment = (
-            "👀 **needs_human**：初筛无法自动确认（弱 HTML / SPA / 缺 covers）。"
-            "不会写入墓碑。请维护者人工看一眼。\n"
+            "👀 **needs_human**：初筛无法自动确认（弱 HTML / SPA / 缺 covers"
+            f"{' / 席位满' if write_err else ''}）。"
+            f"轨：`{track}`。不会写入墓碑。请维护者人工看一眼。{extra}\n"
             f"```json\n{json.dumps(result.get('draft') or result, ensure_ascii=False, indent=2)}\n```"
         )
     else:
@@ -781,12 +961,27 @@ def main(argv: list[str] | None = None) -> int:
     t.add_argument("--reason", default="")
     t.add_argument("--name", default=None)
     t.add_argument("--auth", default=None)
+    t.add_argument(
+        "--track",
+        choices=["web", "video"],
+        default=None,
+        help="Override track (default: parse issue body, else web)",
+    )
     t.add_argument("--write", action="store_true")
 
-    sub.add_parser("refresh-status", help="Rewrite STATUS.md from sites.yaml")
+    sub.add_parser(
+        "refresh-status",
+        help="Rewrite STATUS.md from sites.yaml + videos.yaml",
+    )
     sub.add_parser("inbox", help="Actions: triage from ISSUE_TITLE/BODY env")
 
     c = sub.add_parser("counts", help="Print seat counts JSON")
+    c.add_argument(
+        "--track",
+        choices=["web", "video", "all"],
+        default="all",
+        help="Which track counts to print (default: all)",
+    )
 
     args = p.parse_args(argv)
 
@@ -794,7 +989,14 @@ def main(argv: list[str] | None = None) -> int:
         refresh_status()
         return 0
     if args.cmd == "counts":
-        print(json.dumps(seat_counts(), ensure_ascii=False, indent=2))
+        if args.track == "all":
+            out = {
+                "web": seat_counts(track="web"),
+                "video": seat_counts(track="video"),
+            }
+        else:
+            out = seat_counts(track=args.track)
+        print(json.dumps(out, ensure_ascii=False, indent=2))
         return 0
     if args.cmd == "inbox":
         return cmd_inbox_from_env()
@@ -805,6 +1007,7 @@ def main(argv: list[str] | None = None) -> int:
             name=args.name,
             auth_hint=args.auth,
             write=args.write,
+            track=args.track,
         )
         print(json.dumps(out, ensure_ascii=False, indent=2))
         return 0
