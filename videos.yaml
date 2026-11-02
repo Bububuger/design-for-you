@@ -69,3 +69,30 @@
     外链学习参考，勿当免版权素材再分发。'
   auth: none
   added_at: '2026-11-02'
+- id: shipscenes
+  name: shipscenes.com
+  url: https://shipscenes.com/
+  aliases: []
+  status: candidate
+  kind: storyboard
+  covers:
+  - storyboard
+  - beat
+  - scene
+  - billing
+  - agent-flow
+  - micro-interaction
+  - launch-demo
+  - gen-style
+  search_hint: 'track: video
+
+    kind: storyboard
+
+    covers: storyboard, beat, scene
+
+
+    分镜/节拍参考，喂 agent 拆镜头。
+
+    外链学习参考，勿当免版权素材再分发。'
+  auth: none
+  added_at: '2026-11-02'
