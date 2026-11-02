@@ -17,6 +17,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 SITES_PATH = ROOT / "sites.yaml"
+VIDEOS_PATH = ROOT / "videos.yaml"
 LOGS_DIR = ROOT / "logs"
 
 # Chrome bookmark path convention (macOS default; Linux Chromium variants listed).
@@ -32,7 +33,14 @@ BOOKMARK_FOLDER_HINTS = ("审美与设计灵感", "设计灵感", "design inspir
 
 
 def load_sites() -> list[dict]:
-    with SITES_PATH.open(encoding="utf-8") as f:
+    return load_pool("web")
+
+
+def load_pool(track: str = "web") -> list[dict]:
+    path = VIDEOS_PATH if track == "video" else SITES_PATH
+    if not path.exists():
+        return []
+    with path.open(encoding="utf-8") as f:
         data = yaml.safe_load(f) or []
     return data if isinstance(data, list) else []
 
@@ -67,10 +75,16 @@ def score_site(site: dict, tokens: list[str]) -> int:
     return score
 
 
-def select_pool(query: str, max_core: int = 4, max_candidate: int = 1) -> dict:
-    """Pick up to 4 core + 1 candidate by covers/query match."""
+def select_pool(
+    query: str,
+    max_core: int = 4,
+    max_candidate: int = 1,
+    track: str = "web",
+) -> dict:
+    """Pick up to 4 core + 1 candidate by covers/query match (per track)."""
+    track = "video" if track == "video" else "web"
     tokens = tokenize(query)
-    sites = load_sites()
+    sites = load_pool(track)
     core = [s for s in sites if s.get("status") == "core"]
     cand = [s for s in sites if s.get("status") == "candidate"]
 
@@ -84,35 +98,24 @@ def select_pool(query: str, max_core: int = 4, max_candidate: int = 1) -> dict:
     picked_core = [s for _, s in ranked(core)[:max_core]]
     picked_cand = [s for _, s in ranked(cand)[:max_candidate]]
 
+    def row(s: dict) -> dict:
+        return {
+            "id": s["id"],
+            "name": s["name"],
+            "url": s["url"],
+            "kind": s.get("kind"),
+            "covers": s.get("covers"),
+            "search_hint": s.get("search_hint"),
+            "auth": s.get("auth"),
+            "score": score_site(s, tokens),
+        }
+
     return {
         "query": query,
+        "track": track,
         "tokens": tokens,
-        "core": [
-            {
-                "id": s["id"],
-                "name": s["name"],
-                "url": s["url"],
-                "kind": s.get("kind"),
-                "covers": s.get("covers"),
-                "search_hint": s.get("search_hint"),
-                "auth": s.get("auth"),
-                "score": score_site(s, tokens),
-            }
-            for s in picked_core
-        ],
-        "candidate": [
-            {
-                "id": s["id"],
-                "name": s["name"],
-                "url": s["url"],
-                "kind": s.get("kind"),
-                "covers": s.get("covers"),
-                "search_hint": s.get("search_hint"),
-                "auth": s.get("auth"),
-                "score": score_site(s, tokens),
-            }
-            for s in picked_cand
-        ],
+        "core": [row(s) for s in picked_core],
+        "candidate": [row(s) for s in picked_cand],
     }
 
 
@@ -243,6 +246,12 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--query", required=True)
     s.add_argument("--max-core", type=int, default=4)
     s.add_argument("--max-candidate", type=int, default=1)
+    s.add_argument(
+        "--track",
+        choices=["web", "video"],
+        default="web",
+        help="Pool track to select from (default: web)",
+    )
 
     lg = sub.add_parser("log", help="Append a retrieval receipt to logs/YYYY-MM.jsonl")
     lg.add_argument("--query", required=True)
@@ -259,7 +268,12 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
 
     if args.cmd == "select":
-        out = select_pool(args.query, args.max_core, args.max_candidate)
+        out = select_pool(
+            args.query,
+            args.max_core,
+            args.max_candidate,
+            track=args.track,
+        )
         print(json.dumps(out, ensure_ascii=False, indent=2))
         return 0
     if args.cmd == "log":
