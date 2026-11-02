@@ -1,1 +1,24 @@
-[]
+- id: flowjam
+  name: flowjam.com
+  url: https://www.flowjam.com/launch-videos
+  aliases: []
+  status: candidate
+  kind: launch-demo
+  covers:
+  - launch-demo
+  - saas-launch
+  - micro-interaction
+  - form
+  - landing-page
+  search_hint: 'track: video
+
+    kind: launch-demo
+
+    covers: launch-demo, saas-launch
+
+
+    小而精 launch 视频库，免登录；V-track 首批刷库。
+
+    外链学习参考，勿当免版权素材再分发。'
+  auth: none
+  added_at: '2026-11-02'
