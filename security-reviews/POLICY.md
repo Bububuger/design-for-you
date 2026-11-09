@@ -18,10 +18,11 @@ Skills are first-class: they are **not** forced into `upstreams.yaml` or web/vid
 
 Existing web/video rows present before this policy remain **usable at their current status** without mass re-review and without being stamped safe.
 
-- Missing `security_review_id` / `security_admission` on preexisting rows means **`legacy-unreviewed`** (explicit policy; not an implicit approval).
-- New rows **must not** self-label `legacy-unreviewed` to bypass review (`validate_pool_security.py` compares against `origin/main`).
-- Legacy-unreviewed resources **must not** receive implicit new approvals or promotions.
-- **Core promotion write path is not implemented** (health.yml only prints a stub). `can_promote` is advisory only — do not treat it as an automated promotion framework.
+- **Authoritative grandfather inventory**: `security-reviews/legacy-grandfather.yaml`, anchored at pre-policy commit `b40a1af`. Exact match on **id + track + status + locators (+ integrity)** is required for exemption.
+- A row's claimed `security_admission: legacy-unreviewed` marker is **never** trusted alone.
+- `origin/main` / git parent is **not** used for legacy trust (push-to-main would self-baseline and launder).
+- Status is normalized case-insensitively; unknown statuses are rejected. Transitions into `candidate`/`core` (including `pending-review`→`candidate` and `candidate`→`core`) and any locator/source/alias/integrity mutation **void** grandfathering and require a bound approve review.
+- **Core promotion write path is not implemented** (health.yml only prints a stub). `can_promote` is advisory only.
 - This task does **not** perform a full legacy re-review.
 
 ## Review records
@@ -42,7 +43,7 @@ Evidence snapshots (hashes + selected source files) live under `security-reviews
 
 ### Binding & staleness
 
-Approval matches **track + resource_id + locator + content pin** (AND, never identity-OR-locator). `binds_to` for `approve` must be nonempty with a valid track-specific SHA-256:
+Approval matches **track + resource_id + locator + content pin** (AND, never identity-OR-locator). Pool locators include `url`, `aliases`, and nested skill `source.*` fields; every locator on a gated row must be in the review's `resource_locator` ∪ `related_locators`. `binds_to` for `approve` must be nonempty with a valid track-specific SHA-256:
 
 - skill → `package_integrity_sha256`
 - web → `content_sha256`

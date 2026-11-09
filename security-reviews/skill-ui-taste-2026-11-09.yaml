@@ -7,6 +7,12 @@ resource_id: ui-taste
 resource_locator: https://uizze.sh/.well-known/agent-skills/ui-taste/
 catalog_url: https://skills.sh/site/uizze.sh/ui-taste
 index_url: https://uizze.sh/.well-known/agent-skills/index.json
+# Pool entries may list these related URLs; any other locator voids the binding.
+related_locators:
+  - https://uizze.sh/.well-known/agent-skills/ui-taste/
+  - https://uizze.sh/.well-known/agent-skills/ui-taste/SKILL.md
+  - https://uizze.sh/.well-known/agent-skills/index.json
+  - https://skills.sh/site/uizze.sh/ui-taste
 reviewed_at: "2026-11-09"
 reviewer:
   kind: maintainer-static-review

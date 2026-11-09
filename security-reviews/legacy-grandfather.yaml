@@ -1,0 +1,195 @@
+# GENERATED from git show b40a1af:sites.yaml — edit only with deliberate policy change.
+schema_version: 1
+description: Immutable pre-policy legacy inventory for security admission grandfathering.
+  Only exact matches (id + track + status + locators) are exempt from review. Do not
+  trust row-claimed legacy markers. Skills were not present pre-policy.
+anchor_commit: b40a1af66b26dd8b0a3472c6d49b1e9e665b9fc5
+anchor_note: origin/main tip before skills/security-admission PR (b40a1af)
+tracks:
+  web:
+  - id: mobbin
+    track: web
+    status: core
+    url: https://mobbin.com/
+    aliases: []
+  - id: refero
+    track: web
+    status: core
+    url: https://refero.design/
+    aliases: []
+  - id: 404s
+    track: web
+    status: core
+    url: https://www.404s.design/
+    aliases: []
+  - id: bentogrids
+    track: web
+    status: core
+    url: https://bentogrids.com/
+    aliases: []
+  - id: cta-gallery
+    track: web
+    status: core
+    url: https://www.cta.gallery/
+    aliases: []
+  - id: footer-design
+    track: web
+    status: core
+    url: https://www.footer.design/
+    aliases: []
+  - id: navbar-gallery
+    track: web
+    status: core
+    url: https://www.navbar.gallery/
+    aliases: []
+  - id: recent-design
+    track: web
+    status: core
+    url: https://recent.design/
+    aliases:
+    - https://godly.website/
+  - id: land-book
+    track: web
+    status: core
+    url: https://land-book.com/
+    aliases: []
+  - id: lapa-ninja
+    track: web
+    status: core
+    url: https://www.lapa.ninja/
+    aliases: []
+  - id: minimal-gallery
+    track: web
+    status: core
+    url: https://minimal.gallery/
+    aliases: []
+  - id: dark-mode-design
+    track: web
+    status: core
+    url: https://www.darkmodedesign.com/
+    aliases: []
+  - id: dark-design
+    track: web
+    status: core
+    url: https://www.dark.design/
+    aliases: []
+  - id: awwwards
+    track: web
+    status: core
+    url: https://www.awwwards.com/
+    aliases: []
+  - id: httpster
+    track: web
+    status: core
+    url: https://httpster.net/
+    aliases: []
+  - id: siteinspire
+    track: web
+    status: core
+    url: https://www.siteinspire.com/
+    aliases: []
+  - id: refero-styles
+    track: web
+    status: core
+    url: https://styles.refero.design/
+    aliases: []
+  - id: uizze
+    track: web
+    status: candidate
+    url: https://uizze.com/
+    aliases: []
+  - id: agentic-ux
+    track: web
+    status: candidate
+    url: https://agentic-ux.com/
+    aliases: []
+  - id: shape-of-ai
+    track: web
+    status: candidate
+    url: https://www.shapeof.ai/
+    aliases:
+    - https://shapeof.ai/
+  - id: 60fps
+    track: web
+    status: candidate
+    url: https://60fps.design/
+    aliases: []
+  - id: shadcn-ui
+    track: web
+    status: candidate
+    url: https://ui.shadcn.com/
+    aliases: []
+  - id: prompt-kit
+    track: web
+    status: candidate
+    url: https://github.com/ibelick/prompt-kit
+    aliases: []
+  - id: aceternity-ui
+    track: web
+    status: candidate
+    url: https://ui.aceternity.com/
+    aliases: []
+  - id: magic-ui
+    track: web
+    status: candidate
+    url: https://magicui.design/
+    aliases: []
+  - id: awesome-design-md
+    track: web
+    status: candidate
+    url: https://github.com/VoltAgent/awesome-design-md
+    aliases: []
+  - id: assistant-ui
+    track: web
+    status: candidate
+    url: https://www.assistant-ui.com/elements
+    aliases: []
+  - id: screenrove
+    track: web
+    status: candidate
+    url: https://screenrove.com/
+    aliases: []
+  - id: designme
+    track: web
+    status: candidate
+    url: https://designme.dev/
+    aliases: []
+  - id: data-table-openstatus
+    track: web
+    status: candidate
+    url: https://data-table.openstatus.dev/
+    aliases: []
+  - id: tremor
+    track: web
+    status: candidate
+    url: https://www.tremor.so/
+    aliases:
+    - https://www.tremor.so/
+    - https://tremor.so/
+  - id: dashboardblocks
+    track: web
+    status: candidate
+    url: https://www.dashboardblocks.com/
+    aliases: []
+  - id: saasframe
+    track: web
+    status: candidate
+    url: https://www.saasframe.io/
+    aliases: []
+  - id: saasui
+    track: web
+    status: candidate
+    url: https://www.saasui.design/
+    aliases: []
+  - id: official-design-md
+    track: web
+    status: candidate
+    url: https://github.com/VoltAgent/official-design-md
+    aliases:
+    - https://getdesign.md/
+  - id: uxpatterns-empty-states
+    track: web
+    status: candidate
+    url: https://uxpatterns.dev/patterns/user-feedback/empty-states
+    aliases: []
+  skill: []

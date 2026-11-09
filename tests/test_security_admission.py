@@ -606,36 +606,25 @@ class TestEvidenceIntegrity(unittest.TestCase):
 
 
 class TestPoolValidatorBypass(unittest.TestCase):
-    def test_new_row_cannot_self_label_legacy(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            (root / "sites.yaml").write_text(
-                yaml.safe_dump(
-                    [
-                        {
-                            "id": "sneaky-new",
-                            "name": "Sneaky",
-                            "url": "https://sneaky.example/",
-                            "status": "candidate",
-                            "kind": "component",
-                            "security_admission": "legacy-unreviewed",
-                        }
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            (root / "skills.yaml").write_text("[]\n", encoding="utf-8")
-            reviews = root / "security-reviews"
-            reviews.mkdir()
-            errs = vps.validate_entry(
-                yaml.safe_load((root / "sites.yaml").read_text())[0],
-                "web",
-                baseline={},
-                reviews_dir=reviews,
-            )
-            self.assertTrue(any("self-label" in e for e in errs))
+    def setUp(self) -> None:
+        self.reviews = ROOT / "security-reviews"
+        self.grandfather = vps.load_grandfather()
 
-    def test_direct_yaml_candidate_without_review_fails_validator(self) -> None:
+    def test_claimed_legacy_marker_without_grandfather_rejected(self) -> None:
+        entry = {
+            "id": "sneaky-new",
+            "url": "https://sneaky.example/",
+            "status": "candidate",
+            "kind": "component",
+            "security_admission": "legacy-unreviewed",
+        }
+        errs = vps.validate_entry(
+            entry, "web", grandfather={}, reviews_dir=self.reviews
+        )
+        self.assertTrue(any("legacy-unreviewed rejected" in e for e in errs))
+        self.assertTrue(any("bound review" in e for e in errs))
+
+    def test_direct_yaml_candidate_without_review_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             reviews = Path(tmp)
             entry = {
@@ -645,15 +634,162 @@ class TestPoolValidatorBypass(unittest.TestCase):
                 "kind": "component",
             }
             errs = vps.validate_entry(
-                entry, "web", baseline={}, reviews_dir=reviews
+                entry, "web", grandfather={}, reviews_dir=reviews
             )
             self.assertTrue(errs)
 
-    def test_repo_validator_passes_against_main_baseline(self) -> None:
-        # Current branch should be consistent (legacy sites + reviewed ui-taste).
-        rc = vps.run(base_ref="origin/main")
+    def test_mixed_case_candidate_is_gated(self) -> None:
+        entry = {
+            "id": "MixedCase",
+            "url": "https://mixed.example/",
+            "status": "Candidate",
+            "kind": "component",
+        }
+        errs = vps.validate_entry(
+            entry, "web", grandfather={}, reviews_dir=self.reviews
+        )
+        self.assertTrue(errs)
+        self.assertEqual(vps.normalize_status("Candidate"), "candidate")
+        self.assertIsNone(vps.normalize_status("totally-unknown"))
+
+    def test_pending_review_ok_but_promotion_to_candidate_requires_review(self) -> None:
+        pending = {
+            "id": "sneaky-skill",
+            "url": "https://evil.example/s/",
+            "source": {"install_locator": "https://evil.example/s/"},
+            "status": "pending-review",
+            "kind": "design-skill",
+        }
+        # Nongated: no review required yet.
+        self.assertEqual(
+            vps.validate_entry(
+                pending, "skill", grandfather={}, reviews_dir=self.reviews
+            ),
+            [],
+        )
+        # Even if a prior commit "baseline" knew this id as pending-review,
+        # grandfather inventory must not treat id-only presence as legacy.
+        fake_gf = {
+            "skill": {
+                "sneaky-skill": vps.security_surface(pending, "skill"),
+            }
+        }
+        promoted = dict(pending)
+        promoted["status"] = "candidate"
+        errs = vps.validate_entry(
+            promoted, "skill", grandfather=fake_gf, reviews_dir=self.reviews
+        )
+        self.assertTrue(errs)
+        self.assertTrue(any("status_transition" in e for e in errs))
+
+    def test_legacy_url_swap_requires_review(self) -> None:
+        mobbin_gf = self.grandfather["web"]["mobbin"]
+        # Reconstruct a current entry matching grandfather then mutate URL.
+        mutated = {
+            "id": "mobbin",
+            "status": mobbin_gf["status"],
+            "url": "https://evil.example/",
+            "aliases": [],
+        }
+        errs = vps.validate_entry(
+            mutated, "web", grandfather=self.grandfather, reviews_dir=self.reviews
+        )
+        self.assertTrue(errs)
+        self.assertTrue(any("locator_or_source_mutation" in e for e in errs))
+
+    def test_candidate_to_core_on_unreviewed_legacy_requires_review(self) -> None:
+        # Pick a grandfather candidate if any; else synthesize.
+        cand_id = None
+        for eid, surf in self.grandfather["web"].items():
+            if surf["status"] == "candidate":
+                cand_id = eid
+                break
+        self.assertIsNotNone(cand_id)
+        surf = self.grandfather["web"][cand_id]
+        promoted = {
+            "id": cand_id,
+            "status": "core",
+            "url": surf["locators"][0] if surf["locators"] else "https://x.example/",
+            "aliases": [],
+        }
+        errs = vps.validate_entry(
+            promoted, "web", grandfather=self.grandfather, reviews_dir=self.reviews
+        )
+        self.assertTrue(errs)
+        self.assertTrue(any("status_transition" in e for e in errs))
+
+    def test_exact_grandfather_match_passes_without_review(self) -> None:
+        surf = self.grandfather["web"]["mobbin"]
+        entry = {
+            "id": "mobbin",
+            "status": surf["status"],
+            "url": "https://mobbin.com/",
+            "aliases": [],
+        }
+        # Ensure locators match grandfather normalization.
+        self.assertEqual(
+            vps.security_surface(entry, "web")["locators"], surf["locators"]
+        )
+        errs = vps.validate_entry(
+            entry, "web", grandfather=self.grandfather, reviews_dir=self.reviews
+        )
+        self.assertEqual(errs, [])
+
+    def test_skill_source_locator_mutation_voids_binding_scope(self) -> None:
+        # Declared related locators on the review are allowed.
+        ok_entry = {
+            "id": "ui-taste",
+            "status": "candidate",
+            "url": UI_LOCATOR,
+            "source": {
+                "install_locator": UI_LOCATOR,
+                "catalog_url": "https://skills.sh/site/uizze.sh/ui-taste",
+                "index_url": "https://uizze.sh/.well-known/agent-skills/index.json",
+                "skill_md_url": "https://uizze.sh/.well-known/agent-skills/ui-taste/SKILL.md",
+            },
+            "content_integrity": {"package_integrity": PKG_INTEG},
+            "security_review_id": "skill-ui-taste-2026-11-09",
+            "security_admission": "reviewed-approve-bound",
+        }
+        self.assertEqual(
+            vps.validate_entry(
+                ok_entry, "skill", grandfather=self.grandfather, reviews_dir=self.reviews
+            ),
+            [],
+        )
+        # Undeclared nested source URL is outside review binding scope.
+        evil_catalog = dict(ok_entry)
+        evil_catalog["source"] = {
+            **ok_entry["source"],
+            "catalog_url": "https://evil.example/fake-catalog",
+        }
+        errs = vps.validate_entry(
+            evil_catalog, "skill", grandfather=self.grandfather, reviews_dir=self.reviews
+        )
+        self.assertTrue(any("not in review binding scope" in e for e in errs))
+        # Primary install_locator swap still fails admission binding.
+        evil = dict(ok_entry)
+        evil["url"] = "https://evil.example/not-ui-taste/"
+        evil["source"] = {"install_locator": "https://evil.example/not-ui-taste/"}
+        errs2 = vps.validate_entry(
+            evil, "skill", grandfather=self.grandfather, reviews_dir=self.reviews
+        )
+        self.assertTrue(errs2)
+
+    def test_self_baseline_ignored_and_repo_validator_ok(self) -> None:
+        self.assertTrue(vps.is_self_baseline("HEAD"))
+        rc = vps.run(base_ref="HEAD")
         self.assertEqual(rc, 0)
+        rc2 = vps.run(base_ref=None)
+        self.assertEqual(rc2, 0)
+
+    def test_missing_grandfather_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            missing = Path(tmp) / "nope.yaml"
+            rc = vps.run(grandfather_path=missing, base_ref=None)
+            self.assertEqual(rc, 1)
 
 
 if __name__ == "__main__":
     unittest.main()
+
