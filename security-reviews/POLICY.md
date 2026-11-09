@@ -18,8 +18,10 @@ Skills are first-class: they are **not** forced into `upstreams.yaml` or web/vid
 
 Existing web/video rows present before this policy remain **usable at their current status** without mass re-review and without being stamped safe.
 
-- Treat missing `security_review_id` / `security_admission` on preexisting rows as `legacy-unreviewed`.
+- Missing `security_review_id` / `security_admission` on preexisting rows means **`legacy-unreviewed`** (explicit policy; not an implicit approval).
+- New rows **must not** self-label `legacy-unreviewed` to bypass review (`validate_pool_security.py` compares against `origin/main`).
 - Legacy-unreviewed resources **must not** receive implicit new approvals or promotions.
+- **Core promotion write path is not implemented** (health.yml only prints a stub). `can_promote` is advisory only — do not treat it as an automated promotion framework.
 - This task does **not** perform a full legacy re-review.
 
 ## Review records
@@ -40,11 +42,24 @@ Evidence snapshots (hashes + selected source files) live under `security-reviews
 
 ### Binding & staleness
 
-Approval is bound to the reviewed content integrity. If the live package/page content hash changes, prior approval is **stale** and requires re-review. No review, blocked, insufficient, or stale → cannot auto-enter `candidate`/`core`.
+Approval matches **track + resource_id + locator + content pin** (AND, never identity-OR-locator). `binds_to` for `approve` must be nonempty with a valid track-specific SHA-256:
+
+- skill → `package_integrity_sha256`
+- web → `content_sha256`
+
+Caller-supplied integrity must equal that pin. Issue-supplied hashes are untrusted unless they match the committed review pin for that exact identity/locator (web intake prefers hash of fetched HTML).
+
+Approval is for the **pinned snapshot only**. Live host drift is **not** automatically detected; changing content requires re-review. No review, blocked, insufficient, invalid, or stale → cannot auto-enter `candidate`/`core`.
 
 ### Untrusted Issue bodies
 
 Inbox Issue text **cannot** self-assert an approved review (`security_review: approved`, etc.). Such claims are ignored; only committed review files count.
+
+### Dedup / graveyard tracks
+
+- **skill** pool/graveyard is isolated from web/video (a rejected video URL must not block an unrelated skill).
+- web↔video still share inspiration-URL uniqueness.
+- Video being ungated does **not** imply web/skill security permission.
 
 ### Heuristics
 

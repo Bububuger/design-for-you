@@ -66,10 +66,12 @@ STATUS.md 悬赏单 ──► Grok Bot / PA / 手机投喂
 
 ## Security admission（新 Web / Skill）
 
-- **强制门禁**：`scripts/security_admission.py` 在 triage / `add_candidate` / 晋升辅助路径生效；缺审查、block、insufficient、内容哈希过期 → 不能自动进 candidate/core。  
-- **Issue 不可自证**：正文写 `security_review: approved` 无效。  
-- **存量兼容**：既有 web/video 按 **legacy-unreviewed** 继续可用，不批量盖章安全；无新审查则不能隐式晋升。  
-- **Video**：本迭代不强制 security gate（兼容既有行为）。  
+- **强制门禁**：`scripts/security_admission.py` 在 triage / `add_candidate` 生效；绑定 **track + id + locator + content pin**；缺审查、空 `binds_to`、block、insufficient、哈希不匹配 → 不能进 candidate/core。  
+- **CI 一致性**：`scripts/validate_pool_security.py` + `.github/workflows/validate.yml` 防止直接改 YAML 绕过；对照 `origin/main` 识别 legacy，禁止新行自贴 `legacy-unreviewed`。  
+- **Issue 不可自证**：正文写 `security_review: approved` 无效；Issue 里的 hash 不能把别人的审查贴到错误 locator。  
+- **存量兼容**：既有 web/video **明确**视为 **legacy-unreviewed**（可用，不是隐式 approved）；**无自动晋升写路径**（health 仅 stub）。  
+- **快照批准**：只对已钉扎证据生效；**不会**自动探测线上漂移。  
+- **Video**：本迭代不强制 security gate；video 在池/墓碑中≠ web/skill 已审查。Skill 去重与 web/video 隔离。  
 - **通过 ≠ 授权执行**：不授予执行、凭证、MCP 或消息权限。
 
 ## PA 投喂协议（外部助理只做这件事）

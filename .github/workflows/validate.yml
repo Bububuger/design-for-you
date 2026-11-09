@@ -1,0 +1,34 @@
+# Pool / security-review consistency + unit tests (blocks direct YAML bypasses).
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Pool/security consistency vs main
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1 || true
+          python scripts/validate_pool_security.py --base-ref origin/main

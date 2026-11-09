@@ -33,16 +33,38 @@ scope:
     - MANIFEST.json
     - MODIFICATIONS.md
     - NOTICE
-    - reference/*.md (15 playbooks; full text scanned for heuristics)
-    - references/*.md (3 policy/workflow docs; full text scanned)
+    - reference/anti-slop-craft.md
+    - reference/audit.md
+    - reference/audit.native.md
+    - reference/craft.md
+    - reference/distill.md
+    - reference/image-assets.md
+    - reference/ios.md
+    - reference/mobile-controls.md
+    - reference/mobile-state-performance.md
+    - reference/native-verification.md
+    - reference/new-work.md
+    - reference/operate.md
+    - reference/overdrive.md
+    - reference/polish.md
+    - reference/research.md
+    - references/uizze-image-to-ui.md
+    - references/uizze-reference-policy.md
+    - references/uizze-visual-verification.md
     - scripts/verify-visual-evidence.mjs (static read only; not executed)
     - SKILL.md
+  covered_file_count: 26
+  evidence_complete: true
   not_executed:
     - scripts/verify-visual-evidence.mjs
   not_installed:
     - npx skills add
     - paid Uizze MCP
   evidence_dir: security-reviews/evidence/ui-taste/
+  integrity_note: >-
+    Approval binds to package_integrity_sha256 of the committed evidence tree.
+    Live https://uizze.sh content is NOT auto-revalidated; host drift requires
+    re-review. CI re-hashes on-disk evidence files (not hashes.json alone).
 findings:
   - id: F1
     severity: note

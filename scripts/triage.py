@@ -110,10 +110,15 @@ def domain_of(url: str) -> str:
 
 
 def normalize_url(url: str, follow_redirects: bool = True, timeout: int = 15) -> str:
-    """Strip tracking params; optionally follow redirects to final URL."""
+    """Strip tracking params; optionally follow redirects to final URL.
+
+    Blocks non-public / link-local / decimal-IP hosts before network I/O.
+    """
     url = url.strip()
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
+    if not secu.is_allowed_fetch_url(url):
+        raise ValueError(f"fetch_url_blocked:{url}")
 
     final = url
     if follow_redirects:
@@ -125,6 +130,8 @@ def normalize_url(url: str, follow_redirects: bool = True, timeout: int = 15) ->
                 headers={"User-Agent": USER_AGENT},
             )
             final = resp.url or url
+            if not secu.is_allowed_fetch_url(final):
+                raise ValueError(f"fetch_redirect_blocked:{final}")
         except requests.RequestException:
             final = url
 
@@ -264,26 +271,18 @@ def _dup_in_pool(url: str, sites: list[dict], where: str) -> dict | None:
 
 
 def find_duplicate(url: str, track: str | None = None) -> dict | None:
-    """Check pool(s) + shared graveyard. Prefer same-track pool first when track set."""
+    """Check pool(s) + shared graveyard with track-aware policy.
+
+    - skill: only skills.yaml + graveyard entries with track=skill
+    - web/video: sites + videos (shared inspiration URL uniqueness) + non-skill graveyard
+    """
     d = domain_of(url)
-    if track == "video":
-        order = [
-            ("videos", list_videos()),
-            ("sites", list_sites()),
-            ("skills", list_skills()),
-        ]
-    elif track == "skill":
-        order = [
-            ("skills", list_skills()),
-            ("sites", list_sites()),
-            ("videos", list_videos()),
-        ]
+    if track == "skill":
+        order = [("skills", list_skills())]
+    elif track == "video":
+        order = [("videos", list_videos()), ("sites", list_sites())]
     elif track == "web":
-        order = [
-            ("sites", list_sites()),
-            ("videos", list_videos()),
-            ("skills", list_skills()),
-        ]
+        order = [("sites", list_sites()), ("videos", list_videos())]
     else:
         order = [
             ("sites", list_sites()),
@@ -295,6 +294,15 @@ def find_duplicate(url: str, track: str | None = None) -> dict | None:
         if hit:
             return hit
     for g in list_graveyard():
+        g_track = g.get("track")
+        if track == "skill":
+            if g_track != "skill":
+                continue
+        elif track in ("web", "video"):
+            if g_track == "skill":
+                continue
+        elif g_track == "skill":
+            continue
         if g.get("url") and (
             urls_match(url, g["url"]) or secu.locators_match(url, g["url"])
         ):
@@ -313,6 +321,8 @@ def find_duplicate(url: str, track: str | None = None) -> dict | None:
 
 
 def fetch_html(url: str, timeout: int = 20) -> tuple[str | None, int | None, str | None]:
+    if not secu.is_allowed_fetch_url(url):
+        return None, None, f"fetch_url_blocked:{url}"
     try:
         resp = requests.get(
             url,
@@ -320,6 +330,8 @@ def fetch_html(url: str, timeout: int = 20) -> tuple[str | None, int | None, str
             headers={"User-Agent": USER_AGENT},
             allow_redirects=True,
         )
+        if resp.url and not secu.is_allowed_fetch_url(resp.url):
+            return None, None, f"fetch_redirect_blocked:{resp.url}"
         return resp.text, resp.status_code, resp.url
     except requests.RequestException as e:
         return None, None, str(e)
@@ -830,18 +842,32 @@ def add_candidate(
     track: str = "web",
     *,
     issue_body: str | None = None,
-    skip_security_gate: bool = False,
 ) -> None:
+    """Append a candidate. Gated tracks always require bound security admission.
+
+    There is no public skip/bypass parameter — YAML edits are checked by
+    `scripts/validate_pool_security.py` in CI.
+    """
     track = (track or "web").lower()
     if track not in VALID_TRACKS:
         track = "web"
-    if not skip_security_gate and track in secu.GATED_TRACKS:
+    sites = list_pool(track)
+    eid = entry.get("id")
+    if eid and any(s.get("id") == eid for s in sites):
+        raise RuntimeError(f"duplicate_id:{track}:{eid}")
+    if track in secu.GATED_TRACKS:
+        # Forbid self-labeling legacy on write path.
+        marker = (entry.get("security_admission") or "").lower().replace("_", "-")
+        if marker == "legacy-unreviewed":
+            raise RuntimeError(
+                "security_admission_denied:invalid_review:"
+                "new_writes_cannot_self_label_legacy_unreviewed"
+            )
         adm = _admission_for_entry(entry, track, issue_body=issue_body)
         if not adm.ok:
             raise RuntimeError(f"security_admission_denied:{adm.status}:{adm.reason}")
-        entry.setdefault("security_review_id", adm.review_id)
-        entry.setdefault("security_admission", "reviewed-approve-bound")
-    sites = list_pool(track)
+        entry["security_review_id"] = adm.review_id
+        entry["security_admission"] = "reviewed-approve-bound"
     counts = seat_counts(sites, track=track)
     cand_cap = counts.get("candidate_cap")
     if cand_cap is not None and counts["candidate_total"] >= cand_cap:
@@ -952,7 +978,12 @@ def triage_skill_locator(
     name: str | None = None,
     write: bool = False,
 ) -> dict:
-    """Skill-track intake: metadata only; requires bound security review to admit."""
+    """Skill-track intake: metadata only; requires bound security review to admit.
+
+    Integrity pin comes from the committed review for (track, id, locator).
+    Issue-supplied package_integrity is only accepted when it equals that pin;
+    it cannot attach a foreign approval to a different locator.
+    """
     result: dict[str, Any] = {
         "input_url": url,
         "reason": reason,
@@ -985,17 +1016,41 @@ def triage_skill_locator(
     }
     if explicit.get("license_note"):
         entry["license_note"] = explicit["license_note"]
-    # Optional integrity pin from maintainer body (not an approval claim).
-    integ_m = re.search(
+
+    # Resolve pin ONLY from a review that matches track+id+locator (AND).
+    rev = secu.find_matching_review("skill", locator=locator, resource_id=skill_id)
+    issue_pin_m = re.search(
         r"(?:^|\n)\s*package_integrity\s*[:=]\s*([a-f0-9]{64})\b",
         reason or "",
         re.I,
     )
-    if integ_m:
+    issue_pin = issue_pin_m.group(1).lower() if issue_pin_m else None
+    if rev is not None:
+        pin = secu.review_pin(rev, "skill")
+        if pin:
+            if issue_pin and issue_pin != pin:
+                result["decision"] = "pending_security_review"
+                result["note"] = "issue_package_integrity_does_not_match_review_pin"
+                result["draft"] = entry
+                result["security_admission"] = {
+                    "ok": False,
+                    "status": "stale",
+                    "reason": "issue_pin_mismatch_vs_committed_review",
+                    "review_id": rev.get("id"),
+                }
+                return result
+            entry["content_integrity"] = {
+                "algorithm": "sha256",
+                "package_integrity": pin,
+            }
+        # else: evaluate_admission will reject invalid/empty binds_to
+    elif issue_pin:
+        # Untrusted issue hash without matching review cannot mint approval.
         entry["content_integrity"] = {
             "algorithm": "sha256",
-            "package_integrity": integ_m.group(1).lower(),
+            "package_integrity": issue_pin,
         }
+
     result["label_source"] = "rules"
     result["gallery_gate"] = {"verdict": "skipped", "reasons": ["skill_track"]}
     return _apply_security_gate(result, entry, "skill", reason, write)
@@ -1146,17 +1201,32 @@ def triage_url(
     entry = _draft_entry(
         result["url"], name, kind, covers, search_hint, auth, license_note
     )
-    # Optional maintainer-supplied content pin for web reviews (not approval).
-    content_m = re.search(
-        r"(?:^|\n)\s*content_sha256\s*[:=]\s*([a-f0-9]{64})\b",
-        reason or "",
-        re.I,
-    )
-    if content_m:
+    # Web integrity pin: prefer hash of actually fetched HTML (snapshot evidence).
+    # Issue-supplied content_sha256 is advisory and must match fetched bytes if both
+    # present — it cannot substitute for a committed review binding.
+    if resolved_track == "web" and html:
+        fetched_hash = secu.sha256_text(html)
+        issue_hash_m = re.search(
+            r"(?:^|\n)\s*content_sha256\s*[:=]\s*([a-f0-9]{64})\b",
+            reason or "",
+            re.I,
+        )
+        issue_hash = issue_hash_m.group(1).lower() if issue_hash_m else None
+        if issue_hash and issue_hash != fetched_hash:
+            result["decision"] = "pending_security_review"
+            result["note"] = "issue_content_sha256_does_not_match_fetched_html"
+            result["draft"] = entry
+            result["security_admission"] = {
+                "ok": False,
+                "status": "stale",
+                "reason": "issue_pin_mismatch_vs_fetched_html",
+            }
+            return result
         entry["content_integrity"] = {
             "algorithm": "sha256",
-            "content_sha256": content_m.group(1).lower(),
+            "content_sha256": fetched_hash,
         }
+        result["content_sha256_source"] = "fetched_html"
     result["entry"] = entry
 
     if gate["verdict"] == "pass" or result.get("label_source") == "llm":

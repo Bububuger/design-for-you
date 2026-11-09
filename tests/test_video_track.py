@@ -154,11 +154,27 @@ class TestLandingFreezeWebOnly(unittest.TestCase):
             tmp_path = Path(tmp)
             sites = tmp_path / "sites.yaml"
             videos = tmp_path / "videos.yaml"
+            reviews = tmp_path / "reviews"
+            reviews.mkdir()
             sites.write_text("[]\n", encoding="utf-8")
             videos.write_text("[]\n", encoding="utf-8")
-            old_sites, old_videos = triage.SITES_PATH, triage.VIDEOS_PATH
+            content_hash = "e" * 64
+            (reviews / "web1.yaml").write_text(
+                "id: web1-review\ntrack: web\nresource_id: web1\n"
+                "resource_locator: https://web.example/\n"
+                "reviewed_at: '2026-11-09'\nconclusion: approve\n"
+                f"binds_to:\n  content_sha256: '{content_hash}'\n"
+                "permissions_granted: []\ntrust: untrusted-data\n",
+                encoding="utf-8",
+            )
+            old_sites, old_videos, old_reviews = (
+                triage.SITES_PATH,
+                triage.VIDEOS_PATH,
+                triage.secu.REVIEWS_DIR,
+            )
             triage.SITES_PATH = sites
             triage.VIDEOS_PATH = videos
+            triage.secu.REVIEWS_DIR = reviews
             try:
                 entry = {
                     "id": "x",
@@ -171,28 +187,28 @@ class TestLandingFreezeWebOnly(unittest.TestCase):
                     "auth": "none",
                     "added_at": "2026-11-02",
                 }
-                # Fill video candidate cap
+                # Fill video candidate cap (ungated)
                 for i in range(triage.VIDEO_CANDIDATE_CAP):
                     triage.add_candidate({**entry, "id": f"v{i}"}, track="video")
                 with self.assertRaisesRegex(RuntimeError, r"video candidate pool full"):
                     triage.add_candidate({**entry, "id": "overflow"}, track="video")
-                # Web track still writable independently (seat-cap test; skip
-                # security gate — gated path covered in test_security_admission).
+                # Web track still writable independently when a bound review exists.
                 triage.add_candidate(
                     {
                         **entry,
                         "id": "web1",
                         "kind": "component",
                         "url": "https://web.example/",
+                        "content_integrity": {"content_sha256": content_hash},
                     },
                     track="web",
-                    skip_security_gate=True,
                 )
                 self.assertEqual(len(triage.list_videos()), triage.VIDEO_CANDIDATE_CAP)
                 self.assertEqual(len(triage.list_sites()), 1)
             finally:
                 triage.SITES_PATH = old_sites
                 triage.VIDEOS_PATH = old_videos
+                triage.secu.REVIEWS_DIR = old_reviews
 
 
 class TestPoolTrackSelect(unittest.TestCase):

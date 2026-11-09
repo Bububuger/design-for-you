@@ -5,12 +5,20 @@ or mechanically condemn benign quotations.
 
 Passing a review does NOT grant execution, credentials, or messaging permissions.
 Reviewed sources remain untrusted data. Issue bodies cannot self-assert approval.
+
+Approval binds ONLY to a pinned snapshot (track + resource_id + locator + content
+integrity). Live host drift is NOT automatically detected; re-review is required
+when content changes. Issue-supplied hashes are not trusted unless they match the
+committed review pin for that exact identity/locator.
 """
 
 from __future__ import annotations
 
 import hashlib
+import ipaddress
+import json
 import re
+import socket
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -24,10 +32,12 @@ EVIDENCE_DIR = REVIEWS_DIR / "evidence"
 
 # Tracks that require a committed, hash-bound approval before candidate/core write.
 GATED_TRACKS = frozenset({"web", "skill"})
-# Video remains ungated in this iteration (compatibility).
+# Video remains ungated in this iteration (compatibility). Video membership does
+# NOT grant web/skill security permission.
 UNGATED_TRACKS = frozenset({"video"})
 
 VALID_CONCLUSIONS = frozenset({"approve", "block", "insufficient"})
+SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
 
 # Self-assertions in untrusted Issue bodies — ignored for gating.
 ISSUE_SELF_ASSERT_RE = re.compile(
@@ -97,7 +107,7 @@ class FlagHit:
 @dataclass
 class AdmissionResult:
     ok: bool
-    status: str  # approved | missing | stale | blocked | insufficient | not_required | legacy_unreviewed
+    status: str  # approved | missing | stale | blocked | insufficient | not_required | legacy_unreviewed | invalid_review
     reason: str
     review_id: str | None = None
     binds_to: dict[str, Any] = field(default_factory=dict)
@@ -113,6 +123,7 @@ class AdmissionResult:
             "ignored_issue_claims": self.ignored_issue_claims,
             "permissions_granted": [],
             "trust": "untrusted-data",
+            "snapshot_only": True,
         }
 
 
@@ -122,6 +133,10 @@ def sha256_bytes(data: bytes) -> str:
 
 def sha256_text(text: str) -> str:
     return sha256_bytes(text.encode("utf-8"))
+
+
+def is_sha256_hex(value: str | None) -> bool:
+    return bool(value and SHA256_RE.match(value))
 
 
 def package_integrity_from_hashes(file_hashes: dict[str, str]) -> str:
@@ -230,41 +245,56 @@ def extract_ignored_issue_claims(issue_body: str | None) -> list[str]:
     return [m.group(0).strip() for m in ISSUE_SELF_ASSERT_RE.finditer(issue_body)]
 
 
+def review_locator(rev: dict) -> str:
+    return (
+        rev.get("resource_locator")
+        or (rev.get("binds_to") or {}).get("locator")
+        or ""
+    )
+
+
+def required_pin_field(track: str) -> str:
+    return (
+        "package_integrity_sha256" if track == "skill" else "content_sha256"
+    )
+
+
+def review_pin(rev: dict, track: str) -> str | None:
+    binds = rev.get("binds_to") or {}
+    if not isinstance(binds, dict) or not binds:
+        return None
+    value = binds.get(required_pin_field(track))
+    if is_sha256_hex(value):
+        return value
+    return None
+
+
 def find_matching_review(
     track: str,
     *,
     locator: str | None = None,
-    package_integrity: str | None = None,
     resource_id: str | None = None,
     reviews: list[dict] | None = None,
 ) -> dict | None:
+    """Match ONLY when track + resource_id + locator all agree (AND, not OR)."""
     track = (track or "").lower()
+    if not resource_id or not locator:
+        return None
     pool = reviews if reviews is not None else load_reviews()
-    candidates: list[dict] = []
+    matches: list[dict] = []
     for rev in pool:
         if (rev.get("track") or "").lower() != track:
             continue
-        if resource_id and rev.get("resource_id") == resource_id:
-            candidates.append(rev)
+        if rev.get("resource_id") != resource_id:
             continue
-        rev_loc = (
-            rev.get("resource_locator")
-            or (rev.get("binds_to") or {}).get("locator")
-            or ""
-        )
-        if locator and rev_loc and locators_match(locator, rev_loc):
-            candidates.append(rev)
-    if not candidates:
+        rev_loc = review_locator(rev)
+        if not rev_loc or not locators_match(locator, rev_loc):
+            continue
+        matches.append(rev)
+    if not matches:
         return None
-    # Prefer approve matching integrity when provided; else newest by reviewed_at.
-    def sort_key(r: dict) -> tuple:
-        binds = r.get("binds_to") or {}
-        integ = binds.get("package_integrity_sha256") or binds.get("content_sha256") or ""
-        match_integ = 1 if package_integrity and integ == package_integrity else 0
-        return (match_integ, r.get("reviewed_at") or "", r.get("id") or "")
-
-    candidates.sort(key=sort_key, reverse=True)
-    return candidates[0]
+    matches.sort(key=lambda r: (r.get("reviewed_at") or "", r.get("id") or ""), reverse=True)
+    return matches[0]
 
 
 def evaluate_admission(
@@ -280,10 +310,14 @@ def evaluate_admission(
 ) -> AdmissionResult:
     """Gate for NEW candidate/core writes on web/skill tracks.
 
-    - video: not_required
-    - legacy existing resources: legacy_unreviewed (usable; no new promotion)
+    Approve requires:
+      track + resource_id + locator match a committed review AND
+      nonempty track-specific binds_to pin AND
+      caller-supplied integrity evidence equals that pin.
+
+    - video: not_required (ungated; does not imply web/skill permission)
+    - legacy flag: legacy_unreviewed (usable; no new promotion)
     - Issue self-asserted approval: ignored
-    - missing/stale/blocked/insufficient: not ok
     """
     track = (track or "web").lower()
     ignored = extract_ignored_issue_claims(issue_body)
@@ -292,7 +326,7 @@ def evaluate_admission(
         return AdmissionResult(
             ok=True,
             status="not_required",
-            reason="track_ungated",
+            reason="track_ungated_video_does_not_imply_web_or_skill_permission",
             ignored_issue_claims=ignored,
         )
 
@@ -312,11 +346,18 @@ def evaluate_admission(
             ignored_issue_claims=ignored,
         )
 
+    if not resource_id or not locator:
+        return AdmissionResult(
+            ok=False,
+            status="missing",
+            reason="admission_requires_resource_id_and_locator",
+            ignored_issue_claims=ignored,
+        )
+
     reviews = load_reviews(reviews_dir)
     rev = find_matching_review(
         track,
         locator=locator,
-        package_integrity=package_integrity,
         resource_id=resource_id,
         reviews=reviews,
     )
@@ -324,7 +365,7 @@ def evaluate_admission(
         return AdmissionResult(
             ok=False,
             status="missing",
-            reason="no_committed_security_review",
+            reason="no_review_matching_track_id_and_locator",
             ignored_issue_claims=ignored,
         )
 
@@ -353,50 +394,59 @@ def evaluate_admission(
     if conclusion != "approve":
         return AdmissionResult(
             ok=False,
-            status="missing",
+            status="invalid_review",
             reason=f"invalid_conclusion:{conclusion or 'empty'}",
             review_id=review_id,
             binds_to=binds,
             ignored_issue_claims=ignored,
         )
 
-    # Bind approval to reviewed content integrity.
-    expected_pkg = binds.get("package_integrity_sha256")
-    expected_content = binds.get("content_sha256")
-    if package_integrity and expected_pkg and package_integrity != expected_pkg:
+    if not binds:
         return AdmissionResult(
             ok=False,
-            status="stale",
-            reason="package_integrity_mismatch_requires_rereview",
+            status="invalid_review",
+            reason="approve_requires_nonempty_binds_to",
             review_id=review_id,
             binds_to=binds,
             ignored_issue_claims=ignored,
         )
-    if content_sha256 and expected_content and content_sha256 != expected_content:
+
+    expected = review_pin(rev, track)
+    if not expected:
+        field = required_pin_field(track)
         return AdmissionResult(
             ok=False,
-            status="stale",
-            reason="content_hash_mismatch_requires_rereview",
+            status="invalid_review",
+            reason=f"approve_requires_valid_{field}",
             review_id=review_id,
             binds_to=binds,
             ignored_issue_claims=ignored,
         )
-    # Skill track: integrity required on approve path when review declares one.
-    if track == "skill" and expected_pkg and not package_integrity:
+
+    provided = package_integrity if track == "skill" else content_sha256
+    if not provided:
         return AdmissionResult(
             ok=False,
             status="stale",
-            reason="skill_admission_requires_package_integrity_to_bind",
+            reason=f"missing_input_{required_pin_field(track)}_evidence",
             review_id=review_id,
             binds_to=binds,
             ignored_issue_claims=ignored,
         )
-    # Web track: if review pins content_sha256, caller must supply matching hash.
-    if track == "web" and expected_content and not content_sha256:
+    if not is_sha256_hex(provided):
+        return AdmissionResult(
+            ok=False,
+            status="invalid_review",
+            reason="input_integrity_not_sha256_hex",
+            review_id=review_id,
+            binds_to=binds,
+            ignored_issue_claims=ignored,
+        )
+    if provided != expected:
         return AdmissionResult(
             ok=False,
             status="stale",
-            reason="web_admission_requires_content_hash_to_bind",
+            reason="integrity_mismatch_requires_rereview",
             review_id=review_id,
             binds_to=binds,
             ignored_issue_claims=ignored,
@@ -405,7 +455,7 @@ def evaluate_admission(
     return AdmissionResult(
         ok=True,
         status="approved",
-        reason="bound_review_approve",
+        reason="bound_review_approve_track_id_locator_content",
         review_id=review_id,
         binds_to=binds,
         ignored_issue_claims=ignored,
@@ -435,19 +485,36 @@ def can_write_candidate(
     )
 
 
+def is_legacy_unreviewed_entry(entry: dict) -> bool:
+    """Explicit legacy policy: missing admission fields mean legacy-unreviewed."""
+    marker = (entry.get("security_admission") or "").lower().replace("_", "-")
+    if marker in ("legacy-unreviewed",):
+        return True
+    if entry.get("security_review_id"):
+        return False
+    if marker in ("reviewed-approve-bound", "approved", "reviewed"):
+        return False
+    # No review id and no positive reviewed marker → legacy-unreviewed.
+    return marker in ("", "legacy-unreviewed")
+
+
 def can_promote(
     entry: dict,
     track: str,
     *,
     reviews_dir: Path | None = None,
 ) -> AdmissionResult:
-    """Promotion gate: legacy-unreviewed and blocked cannot gain new core status."""
+    """Advisory promotion check only.
+
+    There is NO automatic core-promotion write path in this repository yet
+    (health.yml prints a stub). This helper must not be read as an implemented
+    promotion framework. Legacy-unreviewed entries cannot gain new core status
+    without a bound review.
+    """
     track = (track or "web").lower()
     if track in UNGATED_TRACKS:
         return evaluate_admission(track)
-    # Explicit legacy marker or missing security_review_id on preexisting rows.
-    marker = (entry.get("security_admission") or "").lower()
-    if marker in ("legacy-unreviewed", "legacy_unreviewed"):
+    if is_legacy_unreviewed_entry(entry):
         return AdmissionResult(
             ok=False,
             status="legacy_unreviewed",
@@ -467,25 +534,83 @@ def can_promote(
     )
 
 
-def safe_fetch_url_allowed(url: str, allow_hosts: set[str] | None = None) -> bool:
-    """SSRF guard for optional review helpers: https only, no link-local/metadata."""
+def _host_is_non_public(host: str) -> bool:
+    """True if host is localhost, metadata, or a non-public IP (incl. decimal/hex)."""
+    h = (host or "").lower().strip().rstrip(".")
+    if not h:
+        return True
+    if h in {"localhost", "metadata.google.internal"}:
+        return True
+    if h.endswith(".localhost") or h.endswith(".local") or h.endswith(".internal"):
+        return True
+    # Decimal / hex IPv4 forms (e.g. 2130706433, 0x7f000001)
+    candidates: list[str] = [h]
+    if h.startswith("0x"):
+        try:
+            candidates.append(str(ipaddress.IPv4Address(int(h, 16))))
+        except ValueError:
+            pass
+    elif h.isdigit():
+        try:
+            candidates.append(str(ipaddress.IPv4Address(int(h, 10))))
+        except ValueError:
+            pass
+    for cand in candidates:
+        try:
+            ip = ipaddress.ip_address(cand)
+            if (
+                ip.is_private
+                or ip.is_loopback
+                or ip.is_link_local
+                or ip.is_multicast
+                or ip.is_reserved
+                or ip.is_unspecified
+            ):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
+def is_allowed_fetch_url(url: str, *, allow_hosts: set[str] | None = None) -> bool:
+    """Shared URL policy for triage network fetches (https public hosts only).
+
+    Resolves DNS when possible and rejects non-public resolved addresses.
+    This hardens the actual fetch path; it is not a complete SSRF product.
+    """
     try:
         parsed = urlparse(url)
     except Exception:  # noqa: BLE001
         return False
+    # Require https for outbound fetches (SSRF surface reduction).
     if parsed.scheme != "https":
         return False
     host = (parsed.hostname or "").lower()
-    if not host or host in {"localhost", "metadata.google.internal"}:
-        return False
-    if host.endswith(".local") or host.endswith(".internal"):
-        return False
-    # Block literal IPs in obviously private ranges (simple string checks).
-    if re.match(r"^(127\.|10\.|192\.168\.|169\.254\.|0\.|::1$)", host):
-        return False
     if allow_hosts is not None and host not in allow_hosts:
         return False
+    if _host_is_non_public(host):
+        return False
+    # If hostname is an IP literal already handled; if DNS name, check resolution.
+    try:
+        ipaddress.ip_address(host)
+        return True  # public IP literal already passed _host_is_non_public
+    except ValueError:
+        pass
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except socket.gaierror:
+        # Unresolvable: allow parse-level public hostname; fetch will fail later.
+        return True
+    for info in infos:
+        addr = info[4][0]
+        if _host_is_non_public(addr):
+            return False
     return True
+
+
+# Back-compat alias used by older tests/docs — same policy as fetch hardening.
+def safe_fetch_url_allowed(url: str, allow_hosts: set[str] | None = None) -> bool:
+    return is_allowed_fetch_url(url, allow_hosts=allow_hosts)
 
 
 def safe_join_under(root: Path, relative: str) -> Path | None:
@@ -500,3 +625,45 @@ def safe_join_under(root: Path, relative: str) -> Path | None:
     except ValueError:
         return None
     return target
+
+
+def verify_evidence_package(
+    evidence_dir: Path,
+    *,
+    expected_integrity: str,
+    expected_file_hashes: dict[str, str] | None = None,
+) -> tuple[bool, str]:
+    """Recompute hashes from on-disk evidence files; do not trust hashes.json alone."""
+    if not evidence_dir.is_dir():
+        return False, "evidence_dir_missing"
+    hashes_path = evidence_dir / "hashes.json"
+    if expected_file_hashes is None:
+        if not hashes_path.exists():
+            return False, "hashes_json_missing"
+        expected_file_hashes = json.loads(hashes_path.read_text(encoding="utf-8"))
+    if not expected_file_hashes:
+        return False, "empty_file_hash_map"
+    computed: dict[str, str] = {}
+    for rel, expect in sorted(expected_file_hashes.items()):
+        path = safe_join_under(evidence_dir, rel)
+        if path is None or not path.is_file():
+            return False, f"missing_evidence_file:{rel}"
+        digest = sha256_bytes(path.read_bytes())
+        if digest != expect:
+            return False, f"hash_mismatch:{rel}"
+        computed[rel] = digest
+    integ = package_integrity_from_hashes(computed)
+    if integ != expected_integrity:
+        return False, "package_integrity_mismatch"
+    return True, "ok"
+
+
+def entry_locator(entry: dict) -> str:
+    return entry.get("url") or (entry.get("source") or {}).get("install_locator") or ""
+
+
+def entry_integrity(entry: dict, track: str) -> str | None:
+    ci = entry.get("content_integrity") or {}
+    if track == "skill":
+        return ci.get("package_integrity")
+    return ci.get("content_sha256")
