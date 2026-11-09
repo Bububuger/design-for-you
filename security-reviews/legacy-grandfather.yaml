@@ -1,8 +1,11 @@
-# GENERATED from git show b40a1af:sites.yaml — edit only with deliberate policy change.
+# DISPLAY/CACHE ONLY — not a trust root.
+# Production validator derives grandfather from git commit anchor_commit below
+# (must match PRE_POLICY_ANCHOR in scripts/validate_pool_security.py) and FAILS
+# if this file mismatches that derivation. Do not edit to mint exemptions.
 schema_version: 1
-description: Immutable pre-policy legacy inventory for security admission grandfathering.
-  Only exact matches (id + track + status + locators) are exempt from review. Do not
-  trust row-claimed legacy markers. Skills were not present pre-policy.
+description: >-
+  Cache of pre-policy sites.yaml surfaces for humans/diff. Trust comes from
+  git-derived grandfather at anchor_commit, not from this HEAD file.
 anchor_commit: b40a1af66b26dd8b0a3472c6d49b1e9e665b9fc5
 anchor_note: origin/main tip before skills/security-admission PR (b40a1af)
 tracks:

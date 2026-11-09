@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
 """CI / local validator: pool rows must match security admission policy.
 
-Legacy exemption comes ONLY from the immutable committed inventory
-`security-reviews/legacy-grandfather.yaml` (pre-policy anchor). It is NOT
-inferred from:
+Legacy exemption is derived ONLY from the immutable pre-policy Git commit
+PRE_POLICY_ANCHOR (must be an ancestor of trusted main). It is NOT granted by:
   - a row's claimed `security_admission: legacy-unreviewed` marker
-  - "id exists on origin/main" / arbitrary git parent (push-to-main self-baseline)
+  - HEAD-committed `legacy-grandfather.yaml` (display/cache only; mismatch fails)
+  - arbitrary CLI grandfather path
+  - "id exists on origin/main" / push-main self-baseline
+
+Honest limit: committed *review approvals* still require human judgment of review
+YAML; this tool cannot stop a malicious PR that rewrites the validator itself.
+The git anchor closes accidental/self-label/inventory-coordination loopholes.
 
 Rules (web + skill):
   - Status must normalize to a recognized value (case/underscore insensitive).
   - Unknown / empty status → reject.
   - `candidate` / `core` require a bound approve review for the *current*
-    security surface, OR an *exact* grandfather match (id+track+status+locators
-    +integrity unchanged). Status transitions (pending-review→candidate,
-    candidate→core, etc.) and locator/source/alias/integrity mutations void
-    grandfathering and require review.
-  - `pending-review` / `blocked` do not require approve, but cannot later enter
-    candidate/core via grandfather merely because the id appeared in a prior
-    commit while nongated.
+    security surface, OR an *exact* derived-grandfather match (id+track+status
+    +locators+integrity unchanged). Status transitions and locator/source/alias
+    mutations void grandfathering and require review.
   - Approve reviews must have nonempty track-specific binds_to pins.
   - Skill evidence packages re-hash on disk (not hashes.json alone).
 
@@ -40,7 +41,10 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 import security_admission as secu  # noqa: E402
 
-GRANDFATHER_PATH = ROOT / "security-reviews" / "legacy-grandfather.yaml"
+# Immutable pre-policy tip (origin/main before skills/security-admission work).
+PRE_POLICY_ANCHOR = "b40a1af66b26dd8b0a3472c6d49b1e9e665b9fc5"
+TRUSTED_MAIN_REFS = ("origin/main", "main")
+GRANDFATHER_CACHE_PATH = ROOT / "security-reviews" / "legacy-grandfather.yaml"
 
 RECOGNIZED_STATUSES = frozenset(
     {"candidate", "core", "pending-review", "blocked"}
@@ -52,6 +56,10 @@ SOURCE_LOCATOR_KEYS = (
     "skill_md_url",
     "index_url",
 )
+
+
+class GrandfatherError(RuntimeError):
+    """Fail-closed grandfather derivation / cache mismatch."""
 
 
 def load_list(path: Path) -> list[dict]:
@@ -84,6 +92,31 @@ def git_rev_parse(ref: str) -> str | None:
         return None
 
 
+def git_is_ancestor(ancestor: str, descendant: str) -> bool:
+    try:
+        subprocess.check_call(
+            ["git", "merge-base", "--is-ancestor", ancestor, descendant],
+            cwd=ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+
+def git_show(ref: str, relpath: str) -> str | None:
+    try:
+        out = subprocess.check_output(
+            ["git", "show", f"{ref}:{relpath}"],
+            cwd=ROOT,
+            stderr=subprocess.DEVNULL,
+        )
+        return out.decode("utf-8")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
 def is_self_baseline(base_ref: str | None) -> bool:
     """True when base_ref resolves to the same commit as HEAD (push-main laundering)."""
     if not base_ref:
@@ -91,6 +124,17 @@ def is_self_baseline(base_ref: str | None) -> bool:
     head = git_rev_parse("HEAD")
     base = git_rev_parse(base_ref)
     return bool(head and base and head == base)
+
+
+def resolve_trusted_main(refs: tuple[str, ...] = TRUSTED_MAIN_REFS) -> str:
+    for ref in refs:
+        sha = git_rev_parse(ref)
+        if sha:
+            return sha
+    raise GrandfatherError(
+        "trusted main ref unavailable "
+        f"(tried {', '.join(refs)}); fetch-depth must include main history"
+    )
 
 
 def collect_locators(entry: dict) -> list[str]:
@@ -106,7 +150,6 @@ def collect_locators(entry: dict) -> list[str]:
         for key in SOURCE_LOCATOR_KEYS:
             if src.get(key):
                 found.append(str(src[key]))
-    # Normalize + dedupe while preserving stability.
     normed: list[str] = []
     seen: set[str] = set()
     for raw in found:
@@ -130,28 +173,95 @@ def security_surface(entry: dict, track: str) -> dict[str, Any]:
     }
 
 
-def load_grandfather(path: Path = GRANDFATHER_PATH) -> dict[str, dict[str, dict]]:
-    """Return {track: {id: grandfather_entry_surface_dict}}."""
+def _rows_to_surfaces(rows: list[dict], track: str) -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    for row in rows:
+        if not isinstance(row, dict) or not row.get("id"):
+            continue
+        synthetic = {
+            "id": row["id"],
+            "status": row.get("status"),
+            "url": row.get("url"),
+            "aliases": list(row.get("aliases") or []),
+            "source": row.get("source") or {},
+            "content_integrity": row.get("content_integrity") or {},
+        }
+        out[row["id"]] = security_surface(synthetic, track)
+    return out
+
+
+def derive_grandfather_from_git(
+    *,
+    anchor: str = PRE_POLICY_ANCHOR,
+    trusted_main: str | None = None,
+) -> dict[str, dict[str, dict]]:
+    """Build grandfather surfaces from the pinned pre-policy commit.
+
+    Fails closed if the anchor is missing or not an ancestor of trusted main.
+    Skills did not exist pre-policy → empty skill track.
+    """
+    anchor_sha = git_rev_parse(anchor)
+    if not anchor_sha:
+        raise GrandfatherError(
+            f"pre-policy anchor {anchor} not found in local git history "
+            "(shallow clone? need fetch-depth: 0)"
+        )
+    main_sha = trusted_main or resolve_trusted_main()
+    if not git_is_ancestor(anchor_sha, main_sha):
+        raise GrandfatherError(
+            f"pre-policy anchor {anchor_sha} is not an ancestor of trusted main "
+            f"{main_sha}; refusing legacy exemptions"
+        )
+
+    sites_raw = git_show(anchor_sha, "sites.yaml")
+    if sites_raw is None:
+        raise GrandfatherError(f"sites.yaml missing at anchor {anchor_sha}")
+    sites = yaml.safe_load(sites_raw) or []
+    if not isinstance(sites, list) or not sites:
+        raise GrandfatherError(f"sites.yaml empty/invalid at anchor {anchor_sha}")
+
+    # skills.yaml must not exist pre-policy; if present, refuse (unexpected).
+    skills_raw = git_show(anchor_sha, "skills.yaml")
+    if skills_raw is not None:
+        raise GrandfatherError(
+            f"skills.yaml unexpectedly present at pre-policy anchor {anchor_sha}"
+        )
+
+    web = _rows_to_surfaces(sites, "web")
+    if not web:
+        raise GrandfatherError("derived grandfather web track is empty")
+    return {"web": web, "skill": {}}
+
+
+def load_grandfather_cache(path: Path = GRANDFATHER_CACHE_PATH) -> dict[str, dict[str, dict]]:
+    """Load display/cache YAML only — NEVER use alone for production trust."""
     if not path.exists():
-        return {}
+        return {"web": {}, "skill": {}}
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     tracks = data.get("tracks") or {}
     out: dict[str, dict[str, dict]] = {"web": {}, "skill": {}}
     for track in ("web", "skill"):
-        for row in tracks.get(track) or []:
-            if not isinstance(row, dict) or not row.get("id"):
-                continue
-            # Build a synthetic entry so collect_locators works.
-            synthetic = {
-                "id": row["id"],
-                "status": row.get("status"),
-                "url": row.get("url"),
-                "aliases": list(row.get("aliases") or []),
-                "source": row.get("source") or {},
-                "content_integrity": row.get("content_integrity") or {},
-            }
-            out[track][row["id"]] = security_surface(synthetic, track)
+        out[track] = _rows_to_surfaces(list(tracks.get(track) or []), track)
     return out
+
+
+def grandfather_maps_equal(
+    a: dict[str, dict[str, dict]], b: dict[str, dict[str, dict]]
+) -> bool:
+    for track in ("web", "skill"):
+        if set((a.get(track) or {})) != set((b.get(track) or {})):
+            return False
+        for eid, surf in (a.get(track) or {}).items():
+            if not surfaces_match_for_legacy(surf, (b.get(track) or {})[eid]):
+                return False
+    return True
+
+
+# Back-compat name used by unit tests that inject comparison maps only.
+# Production trust path must call derive_grandfather_from_git().
+def load_grandfather(path: Path = GRANDFATHER_CACHE_PATH) -> dict[str, dict[str, dict]]:
+    """DEPRECATED for trust: alias of load_grandfather_cache (tests / display)."""
+    return load_grandfather_cache(path)
 
 
 def surfaces_match_for_legacy(current: dict, grandfathered: dict) -> bool:
@@ -240,10 +350,11 @@ def require_bound_review(
             f"{track}/{eid}: security_review_id mismatch "
             f"(entry={entry.get('security_review_id')} review={adm.review_id})"
         )
-    # Binding scope: every pool locator/alias/source URL must be declared on the
-    # matching review (resource_locator ∪ related_locators).
     rev = secu.find_matching_review(
-        track, locator=locator, resource_id=entry.get("id"), reviews=secu.load_reviews(reviews_dir)
+        track,
+        locator=locator,
+        resource_id=entry.get("id"),
+        reviews=secu.load_reviews(reviews_dir),
     )
     if rev is not None:
         allowed = review_allowed_locators(rev)
@@ -262,6 +373,11 @@ def validate_entry(
     grandfather: dict[str, dict[str, dict]],
     reviews_dir: Path,
 ) -> list[str]:
+    """Validate one pool row against a grandfather *map*.
+
+    Callers that inject `grandfather=` are unit-testing comparison logic only.
+    Production `run()` always passes a map from derive_grandfather_from_git().
+    """
     errs: list[str] = []
     eid = entry.get("id") or "<missing-id>"
     raw_status = entry.get("status")
@@ -279,25 +395,19 @@ def validate_entry(
     gf = (grandfather.get(track) or {}).get(eid)
     exact_legacy = bool(gf and surfaces_match_for_legacy(surface, gf))
 
-    # Claimed legacy marker is never trust by itself.
     if marker == "legacy-unreviewed" and not exact_legacy:
         errs.append(
             f"{track}/{eid}: security_admission=legacy-unreviewed rejected "
             "(not an exact pre-policy grandfather match)"
         )
-        # continue — gated rows still need review checks below
 
     if status not in GATED_STATUSES:
-        # pending-review / blocked: schema already checked; no approve required.
         return errs
 
-    # Gated: exact grandfather match (unchanged pre-policy record+status) OR review.
     if exact_legacy:
         return errs
 
-    # Status transition or locator/integrity mutation (or brand-new id).
     if gf and not exact_legacy:
-        # Explain common bypass classes in the error text for operators.
         reasons: list[str] = []
         if surface.get("status") != gf.get("status"):
             reasons.append(
@@ -310,7 +420,6 @@ def validate_entry(
         ) != gf.get("content_sha256"):
             reasons.append("integrity_mutation")
         detail = ",".join(reasons) or "surface_mismatch"
-        # Still must pass bound review; annotate why grandfather did not apply.
         review_errs = require_bound_review(entry, track, reviews_dir=reviews_dir)
         if review_errs:
             errs.append(
@@ -321,7 +430,6 @@ def validate_entry(
             return errs
         return errs
 
-    # Not in grandfather inventory at all.
     errs.extend(require_bound_review(entry, track, reviews_dir=reviews_dir))
     return errs
 
@@ -362,38 +470,49 @@ def validate_skill_evidence(reviews: list[dict], root: Path) -> list[str]:
     return errs
 
 
-def run(
-    *,
-    grandfather_path: Path = GRANDFATHER_PATH,
-    base_ref: str | None = None,
-) -> int:
-    """Validate pools. `base_ref` is NEVER used for legacy trust.
-
-    If provided, a self-baseline (base_ref == HEAD) is reported and ignored.
-    Missing grandfather inventory fails closed for the run.
-    """
+def run(*, base_ref: str | None = None) -> int:
+    """Validate pools. Legacy trust = git-derived grandfather only."""
     errors: list[str] = []
 
     if base_ref:
         if is_self_baseline(base_ref):
             print(
                 f"validate_pool_security: ignoring self-baseline {base_ref} "
-                "(equals HEAD; would launder legacy). Using grandfather inventory only."
+                "(equals HEAD; would launder legacy)."
             )
         else:
             print(
                 f"validate_pool_security: note base_ref={base_ref} is not used for "
-                "legacy trust; grandfather inventory is authoritative."
+                "legacy trust; git pre-policy anchor is authoritative."
             )
 
-    if not grandfather_path.exists():
+    try:
+        grandfather = derive_grandfather_from_git()
+    except GrandfatherError as e:
         print("validate_pool_security: FAIL")
-        print(f" - missing grandfather inventory: {grandfather_path}")
+        print(f" - {e}")
         return 1
 
-    grandfather = load_grandfather(grandfather_path)
-    if not grandfather.get("web"):
-        errors.append("grandfather inventory has empty web track")
+    # Cache YAML is display-only; if present it MUST match derivation.
+    if GRANDFATHER_CACHE_PATH.exists():
+        cache = load_grandfather_cache(GRANDFATHER_CACHE_PATH)
+        labeled = None
+        try:
+            labeled = (
+                yaml.safe_load(GRANDFATHER_CACHE_PATH.read_text(encoding="utf-8")) or {}
+            ).get("anchor_commit")
+        except OSError:
+            labeled = None
+        if labeled and git_rev_parse(str(labeled)) != git_rev_parse(PRE_POLICY_ANCHOR):
+            errors.append(
+                f"legacy-grandfather.yaml anchor_commit {labeled!r} does not match "
+                f"enforced PRE_POLICY_ANCHOR {PRE_POLICY_ANCHOR}"
+            )
+        if not grandfather_maps_equal(cache, grandfather):
+            errors.append(
+                "legacy-grandfather.yaml cache mismatches git-derived grandfather "
+                f"at {PRE_POLICY_ANCHOR}; refusing (coordinated inventory edit)"
+            )
 
     reviews_dir = ROOT / "security-reviews"
     reviews = secu.load_reviews(reviews_dir)
@@ -416,14 +535,18 @@ def run(
         for e in errors:
             print(f" - {e}")
         return 1
-    print("validate_pool_security: OK")
+    print(
+        f"validate_pool_security: OK "
+        f"(grandfather derived from {PRE_POLICY_ANCHOR}; "
+        f"web={len(grandfather['web'])} skill={len(grandfather['skill'])})"
+    )
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         description="Validate pool/security review consistency "
-        "(legacy via committed grandfather inventory only)"
+        "(legacy via git-derived pre-policy anchor only)"
     )
     p.add_argument(
         "--base-ref",
@@ -433,14 +556,10 @@ def main(argv: list[str] | None = None) -> int:
             "trust. Self-baseline (ref==HEAD) is ignored. Prefer empty."
         ),
     )
-    p.add_argument(
-        "--grandfather",
-        default=str(GRANDFATHER_PATH),
-        help="Path to immutable legacy-grandfather.yaml",
-    )
+    # Intentionally NO --grandfather path: that was a production trust bypass.
     args = p.parse_args(argv)
     base = args.base_ref.strip() or None
-    return run(grandfather_path=Path(args.grandfather), base_ref=base)
+    return run(base_ref=base)
 
 
 if __name__ == "__main__":

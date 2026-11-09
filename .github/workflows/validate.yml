@@ -33,11 +33,12 @@ jobs:
       - name: Unit tests
         run: python -m unittest discover -s tests -v
 
-      - name: Pool/security consistency (grandfather inventory)
+      - name: Pool/security consistency (git-derived grandfather)
         run: |
           set -euo pipefail
-          # Do NOT pass origin/main as a legacy trust base (push-to-main would
-          # self-baseline). Grandfather inventory is authoritative.
+          # fetch-depth: 0 above is required so PRE_POLICY_ANCHOR is present and
+          # verifiable as an ancestor of origin/main. HEAD YAML cache is not trust.
+          git cat-file -e b40a1af66b26dd8b0a3472c6d49b1e9e665b9fc5^{commit}
+          git merge-base --is-ancestor b40a1af66b26dd8b0a3472c6d49b1e9e665b9fc5 origin/main
           python scripts/validate_pool_security.py
-          # Diagnostic only: demonstrate self-baseline is ignored if supplied.
           python scripts/validate_pool_security.py --base-ref HEAD

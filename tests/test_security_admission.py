@@ -608,7 +608,8 @@ class TestEvidenceIntegrity(unittest.TestCase):
 class TestPoolValidatorBypass(unittest.TestCase):
     def setUp(self) -> None:
         self.reviews = ROOT / "security-reviews"
-        self.grandfather = vps.load_grandfather()
+        # Production trust map: derived from immutable git anchor (not HEAD YAML).
+        self.grandfather = vps.derive_grandfather_from_git()
 
     def test_claimed_legacy_marker_without_grandfather_rejected(self) -> None:
         entry = {
@@ -660,15 +661,15 @@ class TestPoolValidatorBypass(unittest.TestCase):
             "status": "pending-review",
             "kind": "design-skill",
         }
-        # Nongated: no review required yet.
         self.assertEqual(
             vps.validate_entry(
                 pending, "skill", grandfather={}, reviews_dir=self.reviews
             ),
             [],
         )
-        # Even if a prior commit "baseline" knew this id as pending-review,
-        # grandfather inventory must not treat id-only presence as legacy.
+        # Injected fake map is unit-test isolation only — production run() never
+        # accepts YAML/path overrides. Even with injected pending surface,
+        # promotion to candidate must require review.
         fake_gf = {
             "skill": {
                 "sneaky-skill": vps.security_surface(pending, "skill"),
@@ -684,7 +685,6 @@ class TestPoolValidatorBypass(unittest.TestCase):
 
     def test_legacy_url_swap_requires_review(self) -> None:
         mobbin_gf = self.grandfather["web"]["mobbin"]
-        # Reconstruct a current entry matching grandfather then mutate URL.
         mutated = {
             "id": "mobbin",
             "status": mobbin_gf["status"],
@@ -698,7 +698,6 @@ class TestPoolValidatorBypass(unittest.TestCase):
         self.assertTrue(any("locator_or_source_mutation" in e for e in errs))
 
     def test_candidate_to_core_on_unreviewed_legacy_requires_review(self) -> None:
-        # Pick a grandfather candidate if any; else synthesize.
         cand_id = None
         for eid, surf in self.grandfather["web"].items():
             if surf["status"] == "candidate":
@@ -726,7 +725,6 @@ class TestPoolValidatorBypass(unittest.TestCase):
             "url": "https://mobbin.com/",
             "aliases": [],
         }
-        # Ensure locators match grandfather normalization.
         self.assertEqual(
             vps.security_surface(entry, "web")["locators"], surf["locators"]
         )
@@ -736,7 +734,6 @@ class TestPoolValidatorBypass(unittest.TestCase):
         self.assertEqual(errs, [])
 
     def test_skill_source_locator_mutation_voids_binding_scope(self) -> None:
-        # Declared related locators on the review are allowed.
         ok_entry = {
             "id": "ui-taste",
             "status": "candidate",
@@ -757,7 +754,6 @@ class TestPoolValidatorBypass(unittest.TestCase):
             ),
             [],
         )
-        # Undeclared nested source URL is outside review binding scope.
         evil_catalog = dict(ok_entry)
         evil_catalog["source"] = {
             **ok_entry["source"],
@@ -767,7 +763,6 @@ class TestPoolValidatorBypass(unittest.TestCase):
             evil_catalog, "skill", grandfather=self.grandfather, reviews_dir=self.reviews
         )
         self.assertTrue(any("not in review binding scope" in e for e in errs))
-        # Primary install_locator swap still fails admission binding.
         evil = dict(ok_entry)
         evil["url"] = "https://evil.example/not-ui-taste/"
         evil["source"] = {"install_locator": "https://evil.example/not-ui-taste/"}
@@ -783,13 +778,122 @@ class TestPoolValidatorBypass(unittest.TestCase):
         rc2 = vps.run(base_ref=None)
         self.assertEqual(rc2, 0)
 
-    def test_missing_grandfather_fails_closed(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            missing = Path(tmp) / "nope.yaml"
-            rc = vps.run(grandfather_path=missing, base_ref=None)
+    def test_coordinated_inventory_cache_tamper_rejected(self) -> None:
+        """Poisoned HEAD YAML cannot mint exemptions; must mismatch derivation."""
+        derived = vps.derive_grandfather_from_git()
+        poisoned = {
+            "web": dict(derived["web"]),
+            "skill": {
+                "minted-skill": vps.security_surface(
+                    {
+                        "id": "minted-skill",
+                        "status": "candidate",
+                        "url": "https://evil.example/s/",
+                        "source": {"install_locator": "https://evil.example/s/"},
+                    },
+                    "skill",
+                )
+            },
+        }
+        self.assertFalse(vps.grandfather_maps_equal(poisoned, derived))
+        # New skill / new web id against *derived* map require review.
+        for track, entry in (
+            (
+                "skill",
+                {
+                    "id": "minted-skill",
+                    "status": "candidate",
+                    "url": "https://evil.example/s/",
+                    "source": {"install_locator": "https://evil.example/s/"},
+                    "kind": "design-skill",
+                },
+            ),
+            (
+                "web",
+                {
+                    "id": "brand-new-site",
+                    "status": "candidate",
+                    "url": "https://evil.example/new/",
+                    "kind": "component",
+                },
+            ),
+        ):
+            errs = vps.validate_entry(
+                entry, track, grandfather=derived, reviews_dir=self.reviews
+            )
+            self.assertTrue(errs, track)
+        # Modified mobbin against derived map rejects.
+        mut = {
+            "id": "mobbin",
+            "status": derived["web"]["mobbin"]["status"],
+            "url": "https://evil.example/",
+            "aliases": [],
+        }
+        self.assertTrue(
+            vps.validate_entry(
+                mut, "web", grandfather=derived, reviews_dir=self.reviews
+            )
+        )
+
+    def test_cache_file_mismatch_fails_production_run(self) -> None:
+        cache = vps.GRANDFATHER_CACHE_PATH
+        original = cache.read_text(encoding="utf-8")
+        try:
+            data = yaml.safe_load(original)
+            data["tracks"]["skill"] = [
+                {
+                    "id": "minted-skill",
+                    "track": "skill",
+                    "status": "candidate",
+                    "url": "https://evil.example/s/",
+                    "aliases": [],
+                }
+            ]
+            cache.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+            rc = vps.run(base_ref=None)
             self.assertEqual(rc, 1)
+        finally:
+            cache.write_text(original, encoding="utf-8")
+
+    def test_anchor_unavailable_or_invalid_ancestry_fails_closed(self) -> None:
+        with self.assertRaises(vps.GrandfatherError):
+            vps.derive_grandfather_from_git(anchor="deadbeef" * 5)
+        # Non-ancestor tip of an unrelated orphan is not available; use a blob-ish
+        # fake by requiring ancestry against a commit that isn't a descendant.
+        # PRE_POLICY_ANCHOR as "main" with itself as anchor is fine; invert by
+        # asking whether a child is ancestor of parent — use HEAD as anchor and
+        # require it be ancestor of the pre-policy commit (false unless equal).
+        head = vps.git_rev_parse("HEAD")
+        self.assertIsNotNone(head)
+        if head != vps.git_rev_parse(vps.PRE_POLICY_ANCHOR):
+            with self.assertRaises(vps.GrandfatherError):
+                vps.derive_grandfather_from_git(
+                    anchor=head, trusted_main=vps.PRE_POLICY_ANCHOR
+                )
+
+    def test_no_cli_grandfather_path_in_production(self) -> None:
+        code = __import__("subprocess").call(
+            [
+                sys.executable,
+                str(ROOT / "scripts/validate_pool_security.py"),
+                "--grandfather",
+                "/tmp/evil.yaml",
+            ],
+            stdout=__import__("subprocess").DEVNULL,
+            stderr=__import__("subprocess").DEVNULL,
+        )
+        self.assertNotEqual(code, 0)
+
+    def test_derived_matches_cache_and_unmodified_legacy_passes(self) -> None:
+        derived = vps.derive_grandfather_from_git()
+        cache = vps.load_grandfather_cache()
+        self.assertTrue(vps.grandfather_maps_equal(derived, cache))
+        self.assertEqual(len(derived["web"]), 36)
+        self.assertEqual(len(derived["skill"]), 0)
+        self.assertEqual(vps.run(base_ref=None), 0)
 
 
 if __name__ == "__main__":
     unittest.main()
+
 

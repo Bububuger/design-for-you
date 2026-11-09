@@ -18,10 +18,12 @@ Skills are first-class: they are **not** forced into `upstreams.yaml` or web/vid
 
 Existing web/video rows present before this policy remain **usable at their current status** without mass re-review and without being stamped safe.
 
-- **Authoritative grandfather inventory**: `security-reviews/legacy-grandfather.yaml`, anchored at pre-policy commit `b40a1af`. Exact match on **id + track + status + locators (+ integrity)** is required for exemption.
-- A row's claimed `security_admission: legacy-unreviewed` marker is **never** trusted alone.
-- `origin/main` / git parent is **not** used for legacy trust (push-to-main would self-baseline and launder).
-- Status is normalized case-insensitively; unknown statuses are rejected. Transitions into `candidate`/`core` (including `pending-review`→`candidate` and `candidate`→`core`) and any locator/source/alias/integrity mutation **void** grandfathering and require a bound approve review.
+- **Authoritative grandfather**: derived at validation time from immutable git commit `b40a1af66b26dd8b0a3472c6d49b1e9e665b9fc5` (must be an ancestor of trusted `origin/main`/`main`). Exact match on **id + track + status + locators (+ integrity)** is required for exemption.
+- `security-reviews/legacy-grandfather.yaml` is **display/cache only**; if present it must match the git derivation or validation fails (blocks coordinated inventory+pool edits).
+- A row's claimed `security_admission: legacy-unreviewed` marker is **never** trusted alone. No CLI `--grandfather` path.
+- Missing anchor / non-ancestor / shallow history without the commit → **fail closed**.
+- Status is normalized case-insensitively; unknown statuses are rejected. Transitions into `candidate`/`core` and locator/source/alias/integrity mutations **void** grandfathering and require a bound approve review.
+- **Honest limit**: human-reviewed approval YAML is still a social/process control; a PR that rewrites the validator itself is out of scope for this pin. The git anchor closes self-label / inventory-coordination loopholes.
 - **Core promotion write path is not implemented** (health.yml only prints a stub). `can_promote` is advisory only.
 - This task does **not** perform a full legacy re-review.
 
