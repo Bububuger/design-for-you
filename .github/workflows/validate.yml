@@ -1,0 +1,44 @@
+# Pool / security-review consistency + unit tests.
+# Note: until this file exists on the default branch, GitHub may not register the
+# workflow in the Actions UI / statusCheckRollup for PRs that only add it on the
+# head branch. Local `unittest` + `validate_pool_security.py` are required gates
+# regardless; do not treat absent checks as green CI.
+name: validate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Pool/security consistency (git-derived grandfather)
+        run: |
+          set -euo pipefail
+          # fetch-depth: 0 above is required so PRE_POLICY_ANCHOR is present and
+          # verifiable as an ancestor of origin/main. HEAD YAML cache is not trust.
+          git cat-file -e b40a1af66b26dd8b0a3472c6d49b1e9e665b9fc5^{commit}
+          git merge-base --is-ancestor b40a1af66b26dd8b0a3472c6d49b1e9e665b9fc5 origin/main
+          python scripts/validate_pool_security.py
+          python scripts/validate_pool_security.py --base-ref HEAD

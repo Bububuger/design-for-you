@@ -1,0 +1,138 @@
+# Static security admission review for ui-taste.
+# Conclusion binds ONLY to package_integrity_sha256 below. Live host content
+# that diverges requires re-review. Approval grants no execution/credentials/MCP.
+id: skill-ui-taste-2026-11-09
+track: skill
+resource_id: ui-taste
+resource_locator: https://uizze.sh/.well-known/agent-skills/ui-taste/
+catalog_url: https://skills.sh/site/uizze.sh/ui-taste
+index_url: https://uizze.sh/.well-known/agent-skills/index.json
+# Pool entries may list these related URLs; any other locator voids the binding.
+related_locators:
+  - https://uizze.sh/.well-known/agent-skills/ui-taste/
+  - https://uizze.sh/.well-known/agent-skills/ui-taste/SKILL.md
+  - https://uizze.sh/.well-known/agent-skills/index.json
+  - https://skills.sh/site/uizze.sh/ui-taste
+reviewed_at: "2026-11-09"
+reviewer:
+  kind: maintainer-static-review
+  context: >-
+    design-for-you PR skills-security-admission; read-only HTTPS fetch of the
+    26-file package for hashing and inspection; scripts NOT executed; paid MCP
+    NOT activated; Meta/Astryx out of scope.
+conclusion: approve
+binds_to:
+  package_integrity_sha256: df8efeef431bd8cad961a677ef3a72f6e721f05ee1c3955d804bb45a1855893b
+  file_count: 26
+  skill_frontmatter_version: "0.3.0"
+  manifest_version: uizze-design-v14
+  skill_md_sha256: d1d73a4370a444af09869d55374be27c15a67d232b3d05ff11202508909e7c00
+  manifest_sha256: b02882ff117c0799fd593cbb42c57d3bbac16996cea8d7e07f3426a3603d9c7c
+  script_sha256: fd48a57333491e7bbefec22adde888c58cb211cd4c55b7f4b2e68f79d7e65182
+  checksums_file_verified: true
+scope:
+  method: static-download-hash-and-read
+  covered:
+    - agents/openai.yaml
+    - CHECKSUMS.sha256
+    - LICENSE
+    - MANIFEST.json
+    - MODIFICATIONS.md
+    - NOTICE
+    - reference/anti-slop-craft.md
+    - reference/audit.md
+    - reference/audit.native.md
+    - reference/craft.md
+    - reference/distill.md
+    - reference/image-assets.md
+    - reference/ios.md
+    - reference/mobile-controls.md
+    - reference/mobile-state-performance.md
+    - reference/native-verification.md
+    - reference/new-work.md
+    - reference/operate.md
+    - reference/overdrive.md
+    - reference/polish.md
+    - reference/research.md
+    - references/uizze-image-to-ui.md
+    - references/uizze-reference-policy.md
+    - references/uizze-visual-verification.md
+    - scripts/verify-visual-evidence.mjs (static read only; not executed)
+    - SKILL.md
+  covered_file_count: 26
+  evidence_complete: true
+  not_executed:
+    - scripts/verify-visual-evidence.mjs
+  not_installed:
+    - npx skills add
+    - paid Uizze MCP
+  evidence_dir: security-reviews/evidence/ui-taste/
+  integrity_note: >-
+    Approval binds to package_integrity_sha256 of the committed evidence tree.
+    Live https://uizze.sh content is NOT auto-revalidated; host drift requires
+    re-review. CI re-hashes on-disk evidence files (not hashes.json alone).
+findings:
+  - id: F1
+    severity: note
+    category: provenance_license
+    judgment: accept_with_attribution
+    summary: >-
+      Package declares Apache-2.0; NOTICE/MANIFEST attribute adaptations from
+      impeccable (Apache-2.0), Appllama skills (MIT), and ehmo platform-design-skills
+      (MIT). Publisher claims free skill; optional paid MCP is separate.
+  - id: F2
+    severity: note
+    category: version_label_divergence
+    judgment: pin_content_hash_not_mutable_label
+    summary: >-
+      SKILL.md frontmatter metadata.version is 0.3.0 while MANIFEST.json version
+      is uizze-design-v14. Admission pins package_integrity_sha256 rather than
+      trusting a mutable domain version string.
+  - id: F3
+    severity: low
+    category: optional_paid_mcp
+    judgment: residual_risk_documented_not_blocking
+    summary: >-
+      SKILL.md and references describe optional paid Uizze MCP tools
+      (find_ui_references / find_ui_materials). Free path claims no account/token/
+      MCP/script requirement. MCP was not connected or called in this review.
+      Operators must not treat admission as MCP authorization.
+  - id: F4
+    severity: note
+    category: script_static_behavior
+    judgment: consistent_with_local_only_claim
+    summary: >-
+      scripts/verify-visual-evidence.mjs statically appears to validate a local
+      JSON receipt and local artifact hashes via node:fs/crypto only. No network
+      imports, no writes, no shell. Claimed behavior matches static inspection;
+      runtime was not executed here.
+  - id: F5
+    severity: note
+    category: keyword_benign
+    judgment: benign_quotation_not_inducement
+    summary: >-
+      Heuristic hits for token/credential/secret mostly refer to design tokens or
+      explicit advice such as never send credentials/secrets. No authority-override
+      or jailbreak language found. Keyword detection flags for review only.
+  - id: F6
+    severity: note
+    category: prompt_injection_surface
+    judgment: residual_untrusted_data
+    summary: >-
+      Skill text instructs agents on workflows and optional tool use. No finding
+      that it claims to override host safeguards. Content remains untrusted data
+      after approval; agents must keep host/system policy supreme.
+unverified:
+  - Runtime behavior of verify-visual-evidence.mjs (static only; not executed)
+  - Live behavior of paid Uizze MCP tools, auth flows, and remote material fetch
+  - Future mutations of https://uizze.sh hosted files after this snapshot
+  - Visual/media targets referenced by absolute URLs (banner image etc.) beyond hash of skill text
+  - Completeness of third-party upstream license texts beyond NOTICE + LICENSE copies in package
+  - Any identity/product claims outside the reviewed package (Meta/Astryx explicitly out of scope)
+permissions_granted: []
+trust: untrusted-data
+actual_test_status_observed: not_tested
+notes: >-
+  Serious unresolved malicious findings were not established under static review.
+  Residual risks (optional MCP, mutable host, unexecuted script runtime) are
+  documented; actual agent verification remains not_tested.
