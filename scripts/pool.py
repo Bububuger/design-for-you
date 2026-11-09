@@ -18,6 +18,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 SITES_PATH = ROOT / "sites.yaml"
 VIDEOS_PATH = ROOT / "videos.yaml"
+SKILLS_PATH = ROOT / "skills.yaml"
 LOGS_DIR = ROOT / "logs"
 
 # Chrome bookmark path convention (macOS default; Linux Chromium variants listed).
@@ -37,7 +38,13 @@ def load_sites() -> list[dict]:
 
 
 def load_pool(track: str = "web") -> list[dict]:
-    path = VIDEOS_PATH if track == "video" else SITES_PATH
+    track = (track or "web").lower()
+    if track == "video":
+        path = VIDEOS_PATH
+    elif track == "skill":
+        path = SKILLS_PATH
+    else:
+        path = SITES_PATH
     if not path.exists():
         return []
     with path.open(encoding="utf-8") as f:
@@ -52,6 +59,7 @@ def tokenize(query: str) -> list[str]:
 
 def score_site(site: dict, tokens: list[str]) -> int:
     covers = [str(c).lower() for c in (site.get("covers") or [])]
+    caps = [str(c).lower() for c in (site.get("capabilities") or [])]
     blob = " ".join(
         [
             site.get("id", ""),
@@ -59,16 +67,17 @@ def score_site(site: dict, tokens: list[str]) -> int:
             site.get("kind", ""),
             site.get("search_hint", ""),
             " ".join(covers),
+            " ".join(caps),
         ]
     ).lower()
     score = 0
     for t in tokens:
-        if t in covers:
+        if t in covers or t in caps:
             score += 3
         elif t in blob:
             score += 1
         # soft prefix match on covers
-        for c in covers:
+        for c in covers + caps:
             if c.startswith(t) or t.startswith(c):
                 score += 1
                 break
@@ -82,7 +91,9 @@ def select_pool(
     track: str = "web",
 ) -> dict:
     """Pick up to 4 core + 1 candidate by covers/query match (per track)."""
-    track = "video" if track == "video" else "web"
+    track = (track or "web").lower()
+    if track not in ("web", "video", "skill"):
+        track = "web"
     tokens = tokenize(query)
     sites = load_pool(track)
     core = [s for s in sites if s.get("status") == "core"]
@@ -99,14 +110,17 @@ def select_pool(
     picked_cand = [s for _, s in ranked(cand)[:max_candidate]]
 
     def row(s: dict) -> dict:
+        url = s.get("url") or (s.get("source") or {}).get("install_locator")
         return {
             "id": s["id"],
             "name": s["name"],
-            "url": s["url"],
+            "url": url,
             "kind": s.get("kind"),
             "covers": s.get("covers"),
+            "capabilities": s.get("capabilities"),
             "search_hint": s.get("search_hint"),
             "auth": s.get("auth"),
+            "actual_test_status": s.get("actual_test_status"),
             "score": score_site(s, tokens),
         }
 
@@ -248,7 +262,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--max-candidate", type=int, default=1)
     s.add_argument(
         "--track",
-        choices=["web", "video"],
+        choices=["web", "video", "skill"],
         default="web",
         help="Pool track to select from (default: web)",
     )

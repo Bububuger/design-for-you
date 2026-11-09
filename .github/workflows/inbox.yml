@@ -114,7 +114,7 @@ jobs:
           set -euo pipefail
           git config user.name "design-for-you-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add sites.yaml videos.yaml graveyard.yaml STATUS.md || true
+          git add sites.yaml videos.yaml skills.yaml graveyard.yaml STATUS.md security-reviews || true
           if git diff --cached --quiet; then
             echo "No config changes to commit"
           else

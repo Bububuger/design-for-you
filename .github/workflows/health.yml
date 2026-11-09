@@ -170,7 +170,7 @@ jobs:
           set -euo pipefail
           git config user.name "design-for-you-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add sites.yaml graveyard.yaml STATUS.md .health-state.json || true
+          git add sites.yaml videos.yaml skills.yaml graveyard.yaml STATUS.md .health-state.json security-reviews || true
           # Do NOT amend logs/ here — logs are append-only from local agents.
           if git diff --cached --quiet; then
             echo "No health changes"

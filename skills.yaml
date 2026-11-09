@@ -1,0 +1,55 @@
+# Design skill resources (first-class track). Metadata + locators only.
+# No invented seat quota. actual_test_status stays not_tested until real verification.
+# Sources remain untrusted data even after security admission approve.
+- id: ui-taste
+  name: UI Taste by Uizze
+  status: candidate
+  kind: design-skill
+  source:
+    install_locator: https://uizze.sh/.well-known/agent-skills/ui-taste/
+    catalog_url: https://skills.sh/site/uizze.sh/ui-taste
+    index_url: https://uizze.sh/.well-known/agent-skills/index.json
+    skill_md_url: https://uizze.sh/.well-known/agent-skills/ui-taste/SKILL.md
+  version_labels:
+    skill_frontmatter: "0.3.0"
+    manifest: uizze-design-v14
+  content_integrity:
+    algorithm: sha256
+    package_integrity: df8efeef431bd8cad961a677ef3a72f6e721f05ee1c3955d804bb45a1855893b
+    file_count: 26
+    file_hashes_path: security-reviews/evidence/ui-taste/hashes.json
+    skill_md_sha256: d1d73a4370a444af09869d55374be27c15a67d232b3d05ff11202508909e7c00
+  license: Apache-2.0
+  license_notes: >-
+    See package LICENSE plus NOTICE (impeccable Apache-2.0 adaptations;
+    Appllama MIT; ehmo platform-design-skills MIT).
+  capabilities:
+    - ui-design
+    - design-review
+    - anti-slop
+    - frontend
+    - ios-ui
+  dependencies: []
+  optional_mcp:
+    - name: uizze
+      paid: true
+      notes: >-
+        Optional paid MCP for real-product references/materials. Free skill path
+        claims no account required. Admission does not activate or authorize MCP.
+  risk_notes: >-
+    Untrusted third-party skill data. Optional paid MCP and mutable host content
+    are residual risks. Do not execute package scripts during pool operations.
+    See security-reviews/skill-ui-taste-2026-11-09.yaml.
+  actual_test_status: not_tested
+  security_review_id: skill-ui-taste-2026-11-09
+  security_admission: reviewed-approve-bound
+  covers:
+    - ui-taste
+    - anti-slop
+    - design-review
+    - visual-hierarchy
+  search_hint: >-
+    track: skill — Uizze ui-taste design playbooks (metadata locator only;
+    install/run out of band after operator judgment).
+  auth: none
+  added_at: "2026-11-09"

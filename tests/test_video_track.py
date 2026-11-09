@@ -176,7 +176,8 @@ class TestLandingFreezeWebOnly(unittest.TestCase):
                     triage.add_candidate({**entry, "id": f"v{i}"}, track="video")
                 with self.assertRaisesRegex(RuntimeError, r"video candidate pool full"):
                     triage.add_candidate({**entry, "id": "overflow"}, track="video")
-                # Web track still writable independently
+                # Web track still writable independently (seat-cap test; skip
+                # security gate — gated path covered in test_security_admission).
                 triage.add_candidate(
                     {
                         **entry,
@@ -185,6 +186,7 @@ class TestLandingFreezeWebOnly(unittest.TestCase):
                         "url": "https://web.example/",
                     },
                     track="web",
+                    skip_security_gate=True,
                 )
                 self.assertEqual(len(triage.list_videos()), triage.VIDEO_CANDIDATE_CAP)
                 self.assertEqual(len(triage.list_sites()), 1)
@@ -194,11 +196,16 @@ class TestLandingFreezeWebOnly(unittest.TestCase):
 
 
 class TestPoolTrackSelect(unittest.TestCase):
-    def test_select_video_track_empty_pool(self) -> None:
+    def test_select_video_track_isolated(self) -> None:
         out = select_pool("launch-demo", track="video")
         self.assertEqual(out["track"], "video")
-        self.assertEqual(out["core"], [])
-        self.assertEqual(out["candidate"], [])
+        self.assertEqual(out["core"], [])  # no video core yet
+        # Candidates may exist in videos.yaml; all rows must be video-shaped.
+        for row in out["candidate"]:
+            self.assertIn(
+                row.get("kind"),
+                {"ui-motion", "launch-demo", "storyboard", "gen-style"},
+            )
 
     def test_select_defaults_web(self) -> None:
         out = select_pool("data-table")

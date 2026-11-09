@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """design-for-you triage: URL normalize, dup/graveyard check, loose gallery gate,
-optional LLM covers, STATUS.md generation. Shared by local Skill and Actions.
+optional LLM covers, skill track, security admission gates, STATUS.md generation.
+Shared by local Skill and Actions.
 """
 
 from __future__ import annotations
@@ -19,9 +20,12 @@ import requests
 import yaml
 from bs4 import BeautifulSoup
 
+import security_admission as secu
+
 ROOT = Path(__file__).resolve().parents[1]
 SITES_PATH = ROOT / "sites.yaml"
 VIDEOS_PATH = ROOT / "videos.yaml"
+SKILLS_PATH = ROOT / "skills.yaml"
 GRAVEYARD_PATH = ROOT / "graveyard.yaml"
 STATUS_PATH = ROOT / "STATUS.md"
 
@@ -46,6 +50,10 @@ VIDEO_SEAT_QUOTAS = {
 }
 VIDEO_CANDIDATE_CAP = 12
 VIDEO_CORE_CAP = 18
+
+# Skill track (first-class; no invented seat quota; security-gated)
+SKILL_KINDS = frozenset({"design-skill"})
+VALID_TRACKS = frozenset({"web", "video", "skill"})
 
 STRIP_QUERY_KEYS = {
     "utm_source",
@@ -149,18 +157,34 @@ def list_videos() -> list[dict]:
     return data if isinstance(data, list) else []
 
 
+def list_skills() -> list[dict]:
+    data = load_yaml(SKILLS_PATH)
+    return data if isinstance(data, list) else []
+
+
 def list_pool(track: str = "web") -> list[dict]:
-    return list_videos() if track == "video" else list_sites()
+    track = (track or "web").lower()
+    if track == "video":
+        return list_videos()
+    if track == "skill":
+        return list_skills()
+    return list_sites()
 
 
 def pool_path(track: str = "web") -> Path:
-    return VIDEOS_PATH if track == "video" else SITES_PATH
+    track = (track or "web").lower()
+    if track == "video":
+        return VIDEOS_PATH
+    if track == "skill":
+        return SKILLS_PATH
+    return SITES_PATH
 
 
 def list_graveyard() -> list[dict]:
     data = load_yaml(GRAVEYARD_PATH)
     if isinstance(data, dict):
-        return list(data.get("sites") or [])
+        # Shared graveyard; historically "sites" key — also accept "entries".
+        return list(data.get("sites") or data.get("entries") or [])
     if isinstance(data, list):
         return data
     return []
@@ -203,22 +227,38 @@ def urls_match(a: str, b: str) -> bool:
     return domain_of(a) == domain_of(b)
 
 
+def _track_for_where(where: str) -> str:
+    if where == "videos":
+        return "video"
+    if where == "skills":
+        return "skill"
+    return "web"
+
+
+def _entry_urls(site: dict) -> list[str]:
+    urls: list[str] = []
+    if site.get("url"):
+        urls.append(site["url"])
+    src = site.get("source") or {}
+    if isinstance(src, dict):
+        for key in ("install_locator", "catalog_url", "skill_md_url", "index_url"):
+            if src.get(key):
+                urls.append(src[key])
+    for alias in site.get("aliases") or []:
+        if alias:
+            urls.append(alias)
+    return urls
+
+
 def _dup_in_pool(url: str, sites: list[dict], where: str) -> dict | None:
     for site in sites:
-        if urls_match(url, site.get("url", "")):
-            return {
-                "where": where,
-                "id": site.get("id"),
-                "status": site.get("status"),
-                "track": "video" if where == "videos" else "web",
-            }
-        for alias in site.get("aliases") or []:
-            if urls_match(url, alias):
+        for candidate in _entry_urls(site):
+            if urls_match(url, candidate) or secu.locators_match(url, candidate):
                 return {
                     "where": where,
                     "id": site.get("id"),
                     "status": site.get("status"),
-                    "track": "video" if where == "videos" else "web",
+                    "track": _track_for_where(where),
                 }
     return None
 
@@ -227,23 +267,46 @@ def find_duplicate(url: str, track: str | None = None) -> dict | None:
     """Check pool(s) + shared graveyard. Prefer same-track pool first when track set."""
     d = domain_of(url)
     if track == "video":
-        order = [("videos", list_videos()), ("sites", list_sites())]
+        order = [
+            ("videos", list_videos()),
+            ("sites", list_sites()),
+            ("skills", list_skills()),
+        ]
+    elif track == "skill":
+        order = [
+            ("skills", list_skills()),
+            ("sites", list_sites()),
+            ("videos", list_videos()),
+        ]
     elif track == "web":
-        order = [("sites", list_sites()), ("videos", list_videos())]
+        order = [
+            ("sites", list_sites()),
+            ("videos", list_videos()),
+            ("skills", list_skills()),
+        ]
     else:
-        order = [("sites", list_sites()), ("videos", list_videos())]
+        order = [
+            ("sites", list_sites()),
+            ("videos", list_videos()),
+            ("skills", list_skills()),
+        ]
     for where, sites in order:
         hit = _dup_in_pool(url, sites, where)
         if hit:
             return hit
     for g in list_graveyard():
-        if g.get("url") and urls_match(url, g["url"]):
+        if g.get("url") and (
+            urls_match(url, g["url"]) or secu.locators_match(url, g["url"])
+        ):
             return {"where": "graveyard", "reason": g.get("reason"), "entry": g}
         gd = g.get("domain") or domain_of(g.get("url", "") or "")
         if not gd or gd != d:
             continue
         # github.com domain alone must not collide every repo; need URL key.
         if gd in ("github.com", "www.github.com"):
+            continue
+        # Skill package hosts: require URL match, not bare domain collision.
+        if gd in ("uizze.sh", "skills.sh"):
             continue
         return {"where": "graveyard", "reason": g.get("reason"), "entry": g}
     return None
@@ -369,7 +432,7 @@ EXPLICIT_KIND_RE = re.compile(
     re.I,
 )
 EXPLICIT_TRACK_RE = re.compile(
-    r"(?:^|\n)\s*track\s*[:=]\s*(web|video)\b",
+    r"(?:^|\n)\s*track\s*[:=]\s*(web|video|skill)\b",
     re.I,
 )
 EXPLICIT_COVERS_RE = re.compile(
@@ -395,7 +458,11 @@ def scrub_negated_landing_mentions(text: str) -> str:
 
 
 def kinds_for_track(track: str) -> frozenset[str]:
-    return VIDEO_KINDS if track == "video" else VALID_KINDS
+    if track == "video":
+        return VIDEO_KINDS
+    if track == "skill":
+        return SKILL_KINDS
+    return VALID_KINDS
 
 
 def parse_explicit_labels(reason: str, track: str | None = None) -> dict[str, Any]:
@@ -407,7 +474,7 @@ def parse_explicit_labels(reason: str, track: str | None = None) -> dict[str, An
     if tm:
         out["track"] = tm.group(1).lower()
     resolved_track = (track or out.get("track") or "web").lower()
-    if resolved_track not in ("web", "video"):
+    if resolved_track not in VALID_TRACKS:
         resolved_track = "web"
     allowed = kinds_for_track(resolved_track)
     km = EXPLICIT_KIND_RE.search(reason)
@@ -559,9 +626,30 @@ def slug_id(url: str, name: str | None = None) -> str:
 
 
 def seat_counts(sites: list[dict] | None = None, track: str = "web") -> dict:
-    track = "video" if track == "video" else "web"
+    track = (track or "web").lower()
+    if track not in VALID_TRACKS:
+        track = "web"
     if sites is None:
         sites = list_pool(track)
+    if track == "skill":
+        # No invented quota — counts only.
+        by_status: dict[str, int] = {}
+        for s in sites:
+            st = s.get("status") or "unknown"
+            by_status[st] = by_status.get(st, 0) + 1
+        return {
+            "track": "skill",
+            "total": len(sites),
+            "by_status": by_status,
+            "core_total": by_status.get("core", 0),
+            "candidate_total": by_status.get("candidate", 0),
+            "pending_review_total": by_status.get("pending-review", 0)
+            + by_status.get("pending_review", 0),
+            "blocked_total": by_status.get("blocked", 0),
+            "candidate_cap": None,
+            "core_cap": None,
+            "quota": None,
+        }
     quotas = VIDEO_SEAT_QUOTAS if track == "video" else SEAT_QUOTAS
     default_kind = "ui-motion" if track == "video" else "component"
     core = [s for s in sites if s.get("status") == "core"]
@@ -612,6 +700,7 @@ def generate_status_md(
 ) -> str:
     web = seat_counts(track="web")
     video = seat_counts(track="video")
+    skill = seat_counts(track="skill")
     lines = [
         "# Design For You 缺口悬赏单",
         "",
@@ -621,6 +710,10 @@ def generate_status_md(
         lines.append(
             "> **暂不接收普通 `landing`（整站/营销落地页）新站。** landing 席位已超配或接近满席，冻结新增（仅 Web 轨）。"
         )
+    lines.append(
+        "> **新 Web / Skill 入库需已提交的 security admission review**（见 `security-reviews/`）；"
+        "Issue 正文自称 approved 无效。存量 web/video 按 legacy-unreviewed 兼容，不批量盖章安全。"
+    )
     lines += [
         "",
         "## Web 席位余量（Core）",
@@ -634,6 +727,18 @@ def generate_status_md(
     ]
     lines += _seat_table_rows(video, VIDEO_SEAT_QUOTAS, VIDEO_CORE_CAP, VIDEO_CANDIDATE_CAP)
     lines += [
+        "",
+        "## Skill 资源（无席位配额 · 仅计数）",
+        "",
+        "| 状态 | 数量 |",
+        "| :--- | ---: |",
+        f"| candidate | {skill.get('candidate_total', 0)} |",
+        f"| core | {skill.get('core_total', 0)} |",
+        f"| pending-review | {skill.get('pending_review_total', 0)} |",
+        f"| blocked | {skill.get('blocked_total', 0)} |",
+        f"| **合计** | **{skill.get('total', 0)}** |",
+        "",
+        "投喂：Issue 正文加 `track: skill`；标题=install locator。须先有绑定内容完整性的 review 文件。",
         "",
         "## 首期定向悬赏（高优 · Web）",
         "",
@@ -681,31 +786,78 @@ def refresh_status(miss_terms: list[str] | None = None) -> None:
     print(f"Wrote {STATUS_PATH}")
 
 
-def add_to_graveyard(url: str, reason: str, notes: str = "") -> None:
+def add_to_graveyard(
+    url: str,
+    reason: str,
+    notes: str = "",
+    track: str | None = None,
+) -> None:
     entries = list_graveyard()
-    entries.append(
-        {
-            "domain": domain_of(url),
-            "url": url,
-            "reason": reason,
-            "rejected_at": date.today().isoformat(),
-            "cooldown_until": f"{date.today().year}-12-31",
-            "notes": notes,
-        }
-    )
+    row: dict[str, Any] = {
+        "domain": domain_of(url),
+        "url": url,
+        "reason": reason,
+        "rejected_at": date.today().isoformat(),
+        "cooldown_until": f"{date.today().year}-12-31",
+        "notes": notes,
+    }
+    if track:
+        row["track"] = track
+    entries.append(row)
     save_graveyard(entries)
 
 
-def add_candidate(entry: dict, track: str = "web") -> None:
-    track = "video" if track == "video" else "web"
+def _admission_for_entry(
+    entry: dict,
+    track: str,
+    issue_body: str | None = None,
+) -> secu.AdmissionResult:
+    locator = entry.get("url") or (entry.get("source") or {}).get("install_locator")
+    integ = (entry.get("content_integrity") or {}).get("package_integrity")
+    content_hash = (entry.get("content_integrity") or {}).get("content_sha256")
+    return secu.can_write_candidate(
+        track,
+        locator=locator,
+        package_integrity=integ,
+        content_sha256=content_hash,
+        resource_id=entry.get("id"),
+        issue_body=issue_body,
+    )
+
+
+def add_candidate(
+    entry: dict,
+    track: str = "web",
+    *,
+    issue_body: str | None = None,
+    skip_security_gate: bool = False,
+) -> None:
+    track = (track or "web").lower()
+    if track not in VALID_TRACKS:
+        track = "web"
+    if not skip_security_gate and track in secu.GATED_TRACKS:
+        adm = _admission_for_entry(entry, track, issue_body=issue_body)
+        if not adm.ok:
+            raise RuntimeError(f"security_admission_denied:{adm.status}:{adm.reason}")
+        entry.setdefault("security_review_id", adm.review_id)
+        entry.setdefault("security_admission", "reviewed-approve-bound")
     sites = list_pool(track)
     counts = seat_counts(sites, track=track)
-    cand_cap = counts["candidate_cap"]
-    if counts["candidate_total"] >= cand_cap:
+    cand_cap = counts.get("candidate_cap")
+    if cand_cap is not None and counts["candidate_total"] >= cand_cap:
         raise RuntimeError(f"{track} candidate pool full")
-    # landing freeze is web-only
+    # landing freeze is web-only (skills never consume web landing seats)
     if track == "web" and entry.get("kind") == "landing":
         raise RuntimeError("landing submissions frozen; refuse ordinary landing")
+    if track == "skill":
+        entry.setdefault("actual_test_status", "not_tested")
+        if entry.get("status") not in (
+            "candidate",
+            "core",
+            "pending-review",
+            "blocked",
+        ):
+            entry["status"] = "candidate"
     sites.append(entry)
     save_yaml(pool_path(track), sites)
 
@@ -736,6 +888,119 @@ def _draft_entry(
     return entry
 
 
+def _apply_security_gate(
+    result: dict[str, Any],
+    entry: dict,
+    track: str,
+    reason: str,
+    write: bool,
+) -> dict[str, Any]:
+    """Block candidate/core writes unless a bound review approves (web/skill)."""
+    adm = _admission_for_entry(entry, track, issue_body=reason)
+    result["security_admission"] = adm.as_dict()
+    if adm.ok:
+        entry.setdefault("security_review_id", adm.review_id)
+        entry.setdefault("security_admission", "reviewed-approve-bound")
+        result["entry"] = entry
+        result["decision"] = "accept_candidate"
+        if write:
+            try:
+                add_candidate(entry, track=track, issue_body=reason)
+                refresh_status()
+            except RuntimeError as e:
+                err = str(e)
+                if err.startswith("security_admission_denied:"):
+                    parts = err.split(":", 2)
+                    status = parts[1] if len(parts) > 1 else "missing"
+                    result["decision"] = (
+                        "rejected_security_blocked"
+                        if status == "blocked"
+                        else "pending_security_review"
+                    )
+                    result["write_error"] = err
+                else:
+                    result["decision"] = "needs_human"
+                    result["write_error"] = err
+        return result
+
+    if adm.status == "blocked":
+        result["decision"] = "rejected_security_blocked"
+        result["draft"] = entry
+        if write:
+            add_to_graveyard(
+                entry.get("url")
+                or (entry.get("source") or {}).get("install_locator")
+                or result.get("url", ""),
+                "security_blocked",
+                notes=f"review={adm.review_id} {adm.reason}",
+                track=track,
+            )
+        return result
+
+    result["decision"] = "pending_security_review"
+    result["draft"] = entry
+    result["note"] = (
+        "no_auto_candidate_without_bound_security_review;"
+        "issue_body_cannot_self_assert_approval"
+    )
+    return result
+
+
+def triage_skill_locator(
+    url: str,
+    reason: str = "",
+    name: str | None = None,
+    write: bool = False,
+) -> dict:
+    """Skill-track intake: metadata only; requires bound security review to admit."""
+    result: dict[str, Any] = {
+        "input_url": url,
+        "reason": reason,
+        "track": "skill",
+    }
+    locator = secu.normalize_locator(url)
+    result["url"] = locator
+    dup = find_duplicate(locator, track="skill")
+    if dup:
+        result["decision"] = "duplicate"
+        result["duplicate"] = dup
+        return result
+
+    explicit = parse_explicit_labels(reason, track="skill")
+    covers = list(explicit.get("covers") or ["design-skill"])
+    skill_id = slug_id(locator, name)
+    entry: dict[str, Any] = {
+        "id": skill_id,
+        "name": name or domain_of(locator) or skill_id,
+        "status": "candidate",
+        "kind": explicit.get("kind") or "design-skill",
+        "source": {"install_locator": locator},
+        "url": locator,
+        "aliases": [],
+        "covers": covers,
+        "search_hint": reason.strip() or "track: skill design playbook locator",
+        "auth": "none",
+        "actual_test_status": "not_tested",
+        "added_at": date.today().isoformat(),
+    }
+    if explicit.get("license_note"):
+        entry["license_note"] = explicit["license_note"]
+    # Optional integrity pin from maintainer body (not an approval claim).
+    integ_m = re.search(
+        r"(?:^|\n)\s*package_integrity\s*[:=]\s*([a-f0-9]{64})\b",
+        reason or "",
+        re.I,
+    )
+    if integ_m:
+        entry["content_integrity"] = {
+            "algorithm": "sha256",
+            "package_integrity": integ_m.group(1).lower(),
+        }
+    result["label_source"] = "rules"
+    result["gallery_gate"] = {"verdict": "skipped", "reasons": ["skill_track"]}
+    return _apply_security_gate(result, entry, "skill", reason, write)
+
+
 def triage_url(
     url: str,
     reason: str = "",
@@ -755,10 +1020,13 @@ def triage_url(
     # Resolve track early (explicit CLI/arg wins; else issue body; default web).
     explicit_early = parse_explicit_labels(reason)
     resolved_track = (track or explicit_early.get("track") or "web").lower()
-    if resolved_track not in ("web", "video"):
+    if resolved_track not in VALID_TRACKS:
         resolved_track = "web"
     result["track"] = resolved_track
     allowed_kinds = kinds_for_track(resolved_track)
+
+    if resolved_track == "skill":
+        return triage_skill_locator(url, reason=reason, name=name, write=write)
 
     dup = find_duplicate(normalized, track=resolved_track)
     if dup:
@@ -863,6 +1131,7 @@ def triage_url(
                 result["url"],
                 "landing_freeze",
                 notes="ordinary landing frozen at intake",
+                track="web",
             )
         return result
 
@@ -877,13 +1146,28 @@ def triage_url(
     entry = _draft_entry(
         result["url"], name, kind, covers, search_hint, auth, license_note
     )
+    # Optional maintainer-supplied content pin for web reviews (not approval).
+    content_m = re.search(
+        r"(?:^|\n)\s*content_sha256\s*[:=]\s*([a-f0-9]{64})\b",
+        reason or "",
+        re.I,
+    )
+    if content_m:
+        entry["content_integrity"] = {
+            "algorithm": "sha256",
+            "content_sha256": content_m.group(1).lower(),
+        }
     result["entry"] = entry
 
     if gate["verdict"] == "pass" or result.get("label_source") == "llm":
+        if resolved_track in secu.GATED_TRACKS:
+            return _apply_security_gate(
+                result, entry, resolved_track, reason, write
+            )
         result["decision"] = "accept_candidate"
         if write:
             try:
-                add_candidate(entry, track=resolved_track)
+                add_candidate(entry, track=resolved_track, issue_body=reason)
                 refresh_status()
             except RuntimeError as e:
                 result["decision"] = "needs_human"
@@ -920,18 +1204,37 @@ def cmd_inbox_from_env() -> int:
     decision = result.get("decision")
     track = result.get("track") or "web"
     if decision == "accept_candidate":
+        entry = result.get("entry") or {}
         comment = (
-            f"✅ 已入 **{track} candidate**：`{result['entry']['id']}`\n"
+            f"✅ 已入 **{track} candidate**：`{entry.get('id')}`\n"
             f"- track: {track}\n"
-            f"- url: {result['entry']['url']}\n"
-            f"- kind: {result['entry']['kind']}\n"
-            f"- covers: {', '.join(result['entry'].get('covers') or [])}\n"
+            f"- url: {entry.get('url') or (entry.get('source') or {}).get('install_locator')}\n"
+            f"- kind: {entry.get('kind')}\n"
+            f"- covers: {', '.join(entry.get('covers') or [])}\n"
+            f"- security_review: {entry.get('security_review_id') or (result.get('security_admission') or {}).get('review_id')}\n"
             f"- label: {result.get('label_source')}"
         )
     elif decision == "duplicate":
         comment = f"⏭️ 重复：已在池或墓碑中 — `{result.get('duplicate')}`"
     elif decision == "rejected_landing_freeze":
         comment = "🚫 当前冻结普通 landing 新站（Web 轨；见 STATUS.md）。已记入 graveyard（landing_freeze）。"
+    elif decision == "pending_security_review":
+        adm = result.get("security_admission") or {}
+        comment = (
+            "🛡️ **pending_security_review**：缺少与内容绑定的已提交 security review，"
+            "或 review 已过期/不足。Issue 正文自称 approved **无效**。"
+            f"轨：`{track}`。未写入 candidate/core。\n"
+            f"- admission: `{adm.get('status')}` — {adm.get('reason')}\n"
+            f"- ignored_issue_claims: {adm.get('ignored_issue_claims') or []}\n"
+            "请维护者在 `security-reviews/` 提交 review 后再投喂。"
+        )
+    elif decision == "rejected_security_blocked":
+        adm = result.get("security_admission") or {}
+        comment = (
+            "🚫 **rejected_security_blocked**：存在 conclusion=block 的 security review。"
+            f"轨：`{track}`。不可自动入 candidate/core。\n"
+            f"- review: `{adm.get('review_id')}` — {adm.get('reason')}"
+        )
     elif decision == "needs_human":
         write_err = result.get("write_error")
         extra = f"\n- write_error: {write_err}" if write_err else ""
@@ -963,7 +1266,7 @@ def main(argv: list[str] | None = None) -> int:
     t.add_argument("--auth", default=None)
     t.add_argument(
         "--track",
-        choices=["web", "video"],
+        choices=["web", "video", "skill"],
         default=None,
         help="Override track (default: parse issue body, else web)",
     )
@@ -971,14 +1274,14 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser(
         "refresh-status",
-        help="Rewrite STATUS.md from sites.yaml + videos.yaml",
+        help="Rewrite STATUS.md from sites.yaml + videos.yaml + skills.yaml",
     )
     sub.add_parser("inbox", help="Actions: triage from ISSUE_TITLE/BODY env")
 
     c = sub.add_parser("counts", help="Print seat counts JSON")
     c.add_argument(
         "--track",
-        choices=["web", "video", "all"],
+        choices=["web", "video", "skill", "all"],
         default="all",
         help="Which track counts to print (default: all)",
     )
@@ -993,6 +1296,7 @@ def main(argv: list[str] | None = None) -> int:
             out = {
                 "web": seat_counts(track="web"),
                 "video": seat_counts(track="video"),
+                "skill": seat_counts(track="skill"),
             }
         else:
             out = seat_counts(track=args.track)
