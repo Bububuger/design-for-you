@@ -1,0 +1,58 @@
+# Static security admission review for collect-ui (web track).
+# Conclusion binds ONLY to content_sha256 of the fetched homepage snapshot
+# below. Live host content that diverges requires re-review.
+# Approval grants no execution/credentials/MCP/messaging permissions.
+id: web-collect-ui-2026-11-11
+track: web
+resource_id: collect-ui
+resource_locator: https://collectui.com/
+reviewed_at: "2026-11-11"
+reviewer:
+  kind: pa-static-review
+  context: >-
+    Muse (user's personal assistant) acting as design-for-you feeder under
+    the repo PA protocol; read-only HTTPS GET of the homepage for hashing and
+    inspection; no scripts executed, no account created, no forms submitted.
+conclusion: approve
+binds_to:
+  content_sha256: d28d2f0fe47e0aa9761afa2f78710d4d5653c63754cba024d40cdcb6796b7896
+  fetched_url_final: https://collectui.com/
+  http_status: 200
+  response_bytes: 30215
+scope:
+  method: static-fetch-hash-and-read
+  covered:
+    - homepage HTML snapshot (security-reviews/evidence/collect-ui/homepage.html)
+    - visible-text heuristic scan (repo scripts/security_admission.py FLAG_PATTERNS): zero hits
+    - raw-HTML heuristic scan with the same patterns: zero hits
+  evidence_dir: security-reviews/evidence/collect-ui/
+  integrity_note: >-
+    Approval binds to content_sha256 of the homepage bytes fetched at review
+    time. Homepage HTML is a volatile snapshot: the pool write path re-fetches
+    and requires the then-current bytes to equal this pin, so ordinary host
+    drift will (by design) make intake pending until re-review.
+findings:
+  - id: F1
+    severity: note
+    category: content_nature
+    judgment: untrusted_reference_only
+    summary: >-
+      Collect UI is a third-party design reference site. Pool inclusion is a
+      link-level reference for the local find-design-for-this skill; content
+      remains untrusted data and grants no execution or access rights.
+  - id: F2
+    severity: note
+    category: keyword_scan
+    judgment: no_hits
+    summary: >-
+      No authority-override, credential-exfiltration, dangerous-shell,
+      remote-install or messaging-inducement patterns found in the fetched
+      homepage (visible text and raw HTML).
+unverified:
+  - Any page beyond the homepage (categories, detail pages, paywalled content)
+  - Runtime behavior of the site's own JavaScript (not executed)
+  - Future mutations of hosted content after this snapshot
+  - Account, billing and upload flows (not exercised)
+permissions_granted: []
+trust: untrusted-data
+actual_test_status_observed: not_tested
