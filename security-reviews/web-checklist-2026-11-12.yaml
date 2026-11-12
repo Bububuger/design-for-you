@@ -1,0 +1,98 @@
+# Static security admission review for checklist (web track).
+# Conclusion INSUFFICIENT: snapshot archived for audit only.
+# NOT eligible for automatic live candidate/core admission.
+# Grants no execution/credentials. Do not relabel as approve without
+# a new stable pin + substantive evidence.
+id: web-checklist-2026-11-12
+track: web
+resource_id: checklist
+resource_locator: https://www.checklist.design/
+reviewed_at: "2026-11-12"
+reviewer:
+  kind: cloud-agent-static-review
+  context: >-
+    Cursor Cloud Agent remediating PR27 under Design For You security
+    admission policy; read-only HTTPS GET via triage.USER_AGENT /
+    triage.fetch_html (resp.text → utf-8 sha256); no HTML/JS execution,
+    no account creation, no form submit; fetched content treated as
+    untrusted text only.
+conclusion: insufficient
+binds_to:
+  content_sha256: 3ad5a5d0649a5711677fdac789363a68f229c40b2e01045a88c363d5881142e7
+  fetched_url_source: https://www.checklist.design/
+  fetched_url_final: https://www.checklist.design/
+  http_status: 200
+  response_bytes: 2033
+  fetched_at: "2026-11-12T03:06:52Z"
+  user_agent: "design-for-you-triage/1.0 (+https://github.com/Bububuger/design-for-you; research)"
+  fetch_mode: "triage.fetch_html:requests.Response.text then sha256(utf-8)"
+  live_pin_stable: false
+  snapshot_archive_only: true
+scope:
+  method: static-fetch-hash-and-read
+  live_admission: ineligible
+  primary_evidence: homepage.html
+  evidence_dir: security-reviews/evidence/checklist/
+  evidence_complete: true
+  covered:
+    - homepage HTML snapshot bytes (security-reviews/evidence/checklist/homepage.html)
+    - fetch metadata (security-reviews/evidence/checklist/fetch.json) recording source/final URL, UA, timestamp, triage fetch mode
+    - visible-text + raw-HTML heuristic scan via scripts/security_admission.py FLAG_PATTERNS (hits require judgment; zero ≠ safe)
+  not_executed:
+    - site JavaScript / bundled SPA runtime
+    - third-party embed scripts
+    - login, signup, form submit, or account creation
+  not_reviewed:
+    - pages beyond the homepage (library, case studies, recordings, paywalls)
+    - runtime/auth/paywall behavior
+  integrity_note: >-
+    Snapshot bytes are archived under evidence_dir for independent
+    audit. Because live_admission=ineligible / conclusion=insufficient,
+    this pack MUST NOT unlock automatic candidate/core writes even if
+    a caller supplies the archived hash.
+findings:
+  - id: F1
+    severity: note
+    category: content_nature
+    judgment: untrusted_reference_only
+    summary: >-
+      Checklist Design is a third-party design reference site. Pool inclusion would be
+      link-level reference only; content remains untrusted data and grants no execution or
+      access rights.
+  - id: F2
+    severity: note
+    category: keyword_scan
+    judgment: no_hits_not_proof_of_safety
+    summary: >-
+      Repo FLAG_PATTERNS found no authority-override, credential-exfiltration, dangerous-shell,
+      remote-install, or messaging-inducement spans in visible text or raw homepage HTML. Zero
+      keyword hits are NOT proof of safety; they only record that these heuristics did not fire
+      on the committed snapshot.
+  - id: F3
+    severity: medium
+    category: admission_eligibility
+    judgment: live_admission_ineligible
+    summary: >-
+      homepage is a ~2KB JS/React shell (#root empty); no safe public official substantive
+      checklist body available without executing scripts or authenticating; third-party
+      directories are auxiliary only and were not used as substitute evidence
+  - id: F4
+    severity: medium
+    category: evidence_insufficiency
+    judgment: spa_shell_not_substantive_checklist
+    summary: >-
+      Committed homepage is a Vite/React shell with empty #root and modulepreload hints
+      (react-vendor, supabase). Official checklist bodies are not present in static response
+      bytes. Third-party directory writeups were not accepted as substitute evidence.
+unverified:
+  - Any page beyond the homepage snapshot
+  - Runtime behavior of first-party and third-party JavaScript (not executed)
+  - Future mutations of hosted content after this snapshot
+  - Account, billing, upload, and paywall flows (not exercised)
+  - Hidden prompt / spoofed-authority / exfil content inside unexecuted scripts or post-hydration DOM
+  - Actual checklist documents / empty-state / billing checklists (not present in static homepage bytes)
+  - Bundled JS application behavior (/assets/*.js) — not executed, not treated as reviewed checklist body
+  - Supabase-backed or authenticated surfaces referenced by preload hints
+permissions_granted: []
+trust: untrusted-data
+actual_test_status_observed: not_tested

@@ -401,6 +401,17 @@ def evaluate_admission(
             ignored_issue_claims=ignored,
         )
 
+    archive_conflict = approve_incompatible_with_snapshot_archive(rev)
+    if archive_conflict:
+        return AdmissionResult(
+            ok=False,
+            status="invalid_review",
+            reason=archive_conflict,
+            review_id=review_id,
+            binds_to=binds,
+            ignored_issue_claims=ignored,
+        )
+
     if not binds:
         return AdmissionResult(
             ok=False,
@@ -656,6 +667,82 @@ def verify_evidence_package(
     if integ != expected_integrity:
         return False, "package_integrity_mismatch"
     return True, "ok"
+
+
+def verify_evidence_file_hashes(
+    evidence_dir: Path,
+    *,
+    expected_file_hashes: dict[str, str] | None = None,
+) -> tuple[bool, str, dict[str, str]]:
+    """Recompute per-file digests under evidence_dir; do not trust hashes.json alone.
+
+    Unlike verify_evidence_package, this does not require a skill-style
+    package_integrity rollup — web reviews pin content_sha256 of a primary body.
+    """
+    if not evidence_dir.is_dir():
+        return False, "evidence_dir_missing", {}
+    hashes_path = evidence_dir / "hashes.json"
+    if expected_file_hashes is None:
+        if not hashes_path.exists():
+            return False, "hashes_json_missing", {}
+        raw = json.loads(hashes_path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict) or not raw:
+            return False, "empty_file_hash_map", {}
+        expected_file_hashes = {str(k): str(v) for k, v in raw.items()}
+    if not expected_file_hashes:
+        return False, "empty_file_hash_map", {}
+    computed: dict[str, str] = {}
+    for rel, expect in sorted(expected_file_hashes.items()):
+        path = safe_join_under(evidence_dir, rel)
+        if path is None or not path.is_file():
+            return False, f"missing_evidence_file:{rel}", computed
+        digest = sha256_bytes(path.read_bytes())
+        if digest != expect:
+            return False, f"hash_mismatch:{rel}", computed
+        computed[rel] = digest
+    return True, "ok", computed
+
+
+def looks_like_empty_spa_shell(html: str) -> bool:
+    """Heuristic: tiny document whose body is an empty mount + scripts.
+
+    Used to reject *approve* conclusions that only inspected a JS shell.
+    Keyword-free / short marketing pages with real SSR text are not shells.
+    """
+    blob = html or ""
+    raw_len = len(blob.encode("utf-8"))
+    if raw_len == 0 or raw_len > 8192:
+        return False
+    lower = blob.lower()
+    visible = re.sub(r"(?is)<script\b[^>]*>.*?</script>", " ", blob)
+    visible = re.sub(r"(?is)<style\b[^>]*>.*?</style>", " ", visible)
+    visible = re.sub(r"(?is)<[^>]+>", " ", visible)
+    visible = re.sub(r"\s+", " ", visible).strip()
+    has_mount = bool(re.search(r'id\s*=\s*["\'](?:root|app|__next)["\']', lower))
+    scriptish = lower.count("<script") >= 1
+    return has_mount and scriptish and len(visible) < 200
+
+
+def web_primary_evidence_rel(rev: dict) -> str:
+    scope = rev.get("scope") or {}
+    rel = scope.get("primary_evidence") or "homepage.html"
+    return str(rel).replace("\\", "/").lstrip("/")
+
+
+def approve_incompatible_with_snapshot_archive(rev: dict) -> str | None:
+    """Reject approve that still marks the pack as live-ineligible archive."""
+    binds = rev.get("binds_to") or {}
+    scope = rev.get("scope") or {}
+    if binds.get("snapshot_archive_only") is True:
+        return "approve_incompatible_with_snapshot_archive_only"
+    if binds.get("live_pin_stable") is False:
+        return "approve_requires_live_pin_stable"
+    live = scope.get("live_admission")
+    if isinstance(live, str) and live.lower() in {"ineligible", "false", "no"}:
+        return "approve_incompatible_with_live_admission_ineligible"
+    if live is False:
+        return "approve_incompatible_with_live_admission_ineligible"
+    return None
 
 
 def entry_locator(entry: dict) -> str:

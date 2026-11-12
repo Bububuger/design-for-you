@@ -1,0 +1,94 @@
+# Static security admission review for collectui (web track).
+# Conclusion APPROVE binds ONLY to content_sha256 of the committed
+# homepage.html snapshot below (triage fetch convention). Live host
+# drift at intake requires re-review. Grants no execution/credentials.
+id: web-collectui-2026-11-12
+track: web
+resource_id: collectui
+resource_locator: https://collectui.com/
+reviewed_at: "2026-11-12"
+reviewer:
+  kind: cloud-agent-static-review
+  context: >-
+    Cursor Cloud Agent remediating PR27 under Design For You security
+    admission policy; read-only HTTPS GET via triage.USER_AGENT /
+    triage.fetch_html (resp.text → utf-8 sha256); no HTML/JS execution,
+    no account creation, no form submit; fetched content treated as
+    untrusted text only.
+conclusion: approve
+binds_to:
+  content_sha256: 3563b3fd93c19fd89ff915706f9f6cd5af498f1c7fa1409b4aa2adf150682b4e
+  fetched_url_source: https://collectui.com/
+  fetched_url_final: https://collectui.com/
+  http_status: 200
+  response_bytes: 30276
+  fetched_at: "2026-11-12T03:06:48Z"
+  user_agent: "design-for-you-triage/1.0 (+https://github.com/Bububuger/design-for-you; research)"
+  fetch_mode: "triage.fetch_html:requests.Response.text then sha256(utf-8)"
+  live_pin_stable: true
+  snapshot_archive_only: false
+scope:
+  method: static-fetch-hash-and-read
+  live_admission: eligible
+  primary_evidence: homepage.html
+  evidence_dir: security-reviews/evidence/collectui/
+  evidence_complete: true
+  covered:
+    - homepage HTML snapshot bytes (security-reviews/evidence/collectui/homepage.html)
+    - fetch metadata (security-reviews/evidence/collectui/fetch.json) recording source/final URL, UA, timestamp, triage fetch mode
+    - visible-text + raw-HTML heuristic scan via scripts/security_admission.py FLAG_PATTERNS (hits require judgment; zero ≠ safe)
+  not_executed:
+    - site JavaScript / bundled SPA runtime
+    - third-party embed scripts
+    - login, signup, form submit, or account creation
+  not_reviewed:
+    - pages beyond the homepage (library, case studies, recordings, paywalls)
+    - runtime/auth/paywall behavior
+  integrity_note: >-
+    Approval binds to content_sha256 of committed homepage.html, which
+    must equal triage's sha256(utf-8 of Response.text) at intake. CI
+    re-hashes on-disk evidence (not hashes.json alone). Homepage-only
+    scope is intentional; deeper surfaces need separate reviews.
+findings:
+  - id: F1
+    severity: note
+    category: content_nature
+    judgment: untrusted_reference_only
+    summary: >-
+      Collect UI is a third-party design reference site. Pool inclusion would be link-level
+      reference only; content remains untrusted data and grants no execution or access rights.
+  - id: F2
+    severity: note
+    category: keyword_scan
+    judgment: no_hits_not_proof_of_safety
+    summary: >-
+      Repo FLAG_PATTERNS found no authority-override, credential-exfiltration, dangerous-shell,
+      remote-install, or messaging-inducement spans in visible text or raw homepage HTML. Zero
+      keyword hits are NOT proof of safety; they only record that these heuristics did not fire
+      on the committed snapshot.
+  - id: F3
+    severity: note
+    category: admission_eligibility
+    judgment: homepage_only_bound
+    summary: >-
+      stable homepage pin under triage UA; homepage-only approve
+  - id: F4
+    severity: low
+    category: external_scripts
+    judgment: unexecuted_third_party_embeds
+    summary: >-
+      Homepage references third-party Panda Network scripts (pl/sponsors/dock/i.panda.network).
+      Treated as untrusted external dependencies; not fetched for execution; runtime behavior
+      unverified.
+unverified:
+  - Any page beyond the homepage snapshot
+  - Runtime behavior of first-party and third-party JavaScript (not executed)
+  - Future mutations of hosted content after this snapshot
+  - Account, billing, upload, and paywall flows (not exercised)
+  - Hidden prompt / spoofed-authority / exfil content inside unexecuted scripts or post-hydration DOM
+  - Category pages, designer pages, trending feeds, and listing detail pages
+  - Sponsor / Panda Network embed runtime (sponsors.panda.network, dock.panda.network, etc. — scripts not executed)
+  - Any authenticated or paid listing flows
+permissions_granted: []
+trust: untrusted-data
+actual_test_status_observed: not_tested

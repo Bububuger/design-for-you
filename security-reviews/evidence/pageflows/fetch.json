@@ -1,0 +1,46 @@
+{
+  "resource_id": "pageflows",
+  "source_url": "https://pageflows.com/",
+  "final_url": "https://pageflows.com/",
+  "http_status": 200,
+  "fetched_at": "2026-11-12T03:06:50Z",
+  "user_agent": "design-for-you-triage/1.0 (+https://github.com/Bububuger/design-for-you; research)",
+  "fetch_mode": "triage.fetch_html:requests.Response.text then sha256(utf-8)",
+  "content_sha256": "9722379c0e9b273796d8321b5b67e9d1e89951840a11fac0b7eefa8098d84b2a",
+  "response_bytes": 240239,
+  "stability_probe": {
+    "fetches": 4,
+    "unique_sha256": [
+      "4bb2b2d8f33b600ce7ebb91c4f849592b7077319ff85fac0d3e46bb6dbcdb6e4",
+      "835550d3b7fa2eb2ac4918233de084231adadbacfb80a9b3bc9dd306beab828b",
+      "9722379c0e9b273796d8321b5b67e9d1e89951840a11fac0b7eefa8098d84b2a",
+      "e5bcd0312b5d98be4469838686fc2ff3084d6fe77f6d3d0c6bf4ca965a6f552f"
+    ],
+    "stable": false
+  },
+  "analysis": {
+    "bytes": 240239,
+    "visible_text_len": 14765,
+    "script_src_count": 15,
+    "script_srcs_sample": [
+      "https://www.googletagmanager.com/gtag/js?id=G-HTWBWPWEKF",
+      "https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js",
+      "https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js",
+      "https://unpkg.com/masonry-layout@4/dist/masonry.pkgd.min.js",
+      "https://cdnjs.cloudflare.com/ajax/libs/slick-carousel/1.8.1/slick.min.js",
+      "https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.js",
+      "https://unpkg.com/flickity/dist/flickity.pkgd.min.js",
+      "https://cdn.lottielab.com/s/lottie-player@1.x/player-web.min.js",
+      "/static/website/js/custom.js?v=2.2&q=25",
+      "/static/website/js/header.js?v=2.3&q=26",
+      "/static/website/js/header-pages.js?v=2.4&q=27",
+      "/static/website/js/homepage.js?v=2.5&q=29"
+    ],
+    "external_link_count": 8,
+    "spa_shell": false,
+    "flag_hits_visible": [],
+    "flag_hits_raw": []
+  },
+  "decision_reason": "homepage_bytes_unstable_under_triage_ua_no_live_pin",
+  "proposed_conclusion": "insufficient"
+}

@@ -1,0 +1,44 @@
+{
+  "resource_id": "baymard",
+  "source_url": "https://baymard.com/",
+  "final_url": "https://baymard.com/",
+  "http_status": 200,
+  "fetched_at": "2026-11-12T03:06:54Z",
+  "user_agent": "design-for-you-triage/1.0 (+https://github.com/Bububuger/design-for-you; research)",
+  "fetch_mode": "triage.fetch_html:requests.Response.text then sha256(utf-8)",
+  "content_sha256": "2fd153c509774075606d6338d7219c53db2a443ad4477242ad328e5d249c8e33",
+  "response_bytes": 598276,
+  "stability_probe": {
+    "fetches": 4,
+    "unique_sha256": [
+      "2fd153c509774075606d6338d7219c53db2a443ad4477242ad328e5d249c8e33",
+      "946670ac344ddff8ece89589a94ee861eba77844c00e9894a7a7a4e3b5ac4c64"
+    ],
+    "stable": false
+  },
+  "analysis": {
+    "bytes": 598276,
+    "visible_text_len": 16879,
+    "script_src_count": 52,
+    "script_srcs_sample": [
+      "/_next/static/immutable/chunks/0c0hxoamwjsbw.js",
+      "/_next/static/immutable/chunks/1o0awuyp1ijgz.js",
+      "/_next/static/immutable/chunks/3otij3wev94rl.js",
+      "/_next/static/immutable/chunks/2hv5uut3xad4q.js",
+      "/_next/static/immutable/chunks/2enswpqq7x8po.js",
+      "/_next/static/immutable/chunks/0_-rama7hd8rt.js",
+      "/_next/static/immutable/chunks/2ckrz4mrn58w-.js",
+      "/_next/static/immutable/chunks/2tipouj05ydmc.js",
+      "/_next/static/immutable/chunks/3_689dy6tk1gp.js",
+      "/_next/static/immutable/chunks/2dxj6jjloeorn.js",
+      "/_next/static/immutable/chunks/05hmxq2s4e0-9.js",
+      "/_next/static/immutable/chunks/0jop2fdkz0qmn.js"
+    ],
+    "external_link_count": 39,
+    "spa_shell": false,
+    "flag_hits_visible": [],
+    "flag_hits_raw": []
+  },
+  "decision_reason": "homepage_bytes_unstable_under_triage_ua_no_live_pin",
+  "proposed_conclusion": "insufficient"
+}

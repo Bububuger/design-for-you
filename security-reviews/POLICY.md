@@ -43,16 +43,25 @@ Committed YAML under `security-reviews/*.yaml` (not Issue text). Required fields
 
 Evidence snapshots (hashes + selected source files) live under `security-reviews/evidence/`. Do not vendor huge unrelated assets.
 
+### Web evidence honesty
+
+Web `approve` reviews must commit the **audited response body** (and fetch metadata) under `scope.evidence_dir` so reviewers can inspect hidden text without trusting `hashes.json` alone. CI re-hashes on-disk files; `binds_to.content_sha256` must equal the primary body digest (default `homepage.html`), using the same convention as triage (`Response.text` → UTF-8 SHA-256) and the triage User-Agent.
+
+- Homepage-only scope is **not** library / case-study / paywall / recording coverage. State unknowns explicitly.
+- Empty SPA/JS shells (no substantive static body) are **not** approvable; use `conclusion: insufficient` until safe public official substantive evidence exists. Third-party directory writeups are auxiliary and never substitute evidence.
+- Dynamic hosts without a **stable current** pin under the triage fetch convention remain **live-admission ineligible**: archive the snapshot with `conclusion: insufficient` (`scope.live_admission: ineligible`, `binds_to.snapshot_archive_only: true`). Do not strip scripts, broaden text hashes, relabel an old snapshot as live, or rotate a hash solely to turn the gate green.
+- An `approve` that still marks `snapshot_archive_only` / `live_admission: ineligible` / `live_pin_stable: false` is **invalid** (fail closed).
+
 ### Binding & staleness
 
-Approval matches **track + resource_id + locator + content pin** (AND, never identity-OR-locator). Pool locators include `url`, `aliases`, and nested skill `source.*` fields; every locator on a gated row must be in the review's `resource_locator` ∪ `related_locators`. `binds_to` for `approve` must be nonempty with a valid track-specific SHA-256:
+Approval matches **track + resource_id + locator + content pin** (AND, never identity-OR-locator). Resource ids for URL-only triage follow `triage.slug_id(url)` (host label); do not invent hyphenated aliases that fail AND matching. Pool locators include `url`, `aliases`, and nested skill `source.*` fields; every locator on a gated row must be in the review's `resource_locator` ∪ `related_locators`. `binds_to` for `approve` must be nonempty with a valid track-specific SHA-256:
 
 - skill → `package_integrity_sha256`
 - web → `content_sha256`
 
 Caller-supplied integrity must equal that pin. Issue-supplied hashes are untrusted unless they match the committed review pin for that exact identity/locator (web intake prefers hash of fetched HTML).
 
-Approval is for the **pinned snapshot only**. Live host drift is **not** automatically detected; changing content requires re-review. No review, blocked, insufficient, invalid, or stale → cannot auto-enter `candidate`/`core`.
+Approval is for the **pinned snapshot only**. Changing content requires re-review. Web intake re-fetches HTML and compares to the pin; host drift → pending until a new bound review. No review, blocked, insufficient, invalid, or stale → cannot auto-enter `candidate`/`core`.
 
 ### Untrusted Issue bodies
 
