@@ -1,0 +1,35 @@
+{
+  "resource_id": "collectui",
+  "source_url": "https://collectui.com/",
+  "final_url": "https://collectui.com/",
+  "http_status": 200,
+  "fetched_at": "2026-11-12T03:06:48Z",
+  "user_agent": "design-for-you-triage/1.0 (+https://github.com/Bububuger/design-for-you; research)",
+  "fetch_mode": "triage.fetch_html:requests.Response.text then sha256(utf-8)",
+  "content_sha256": "3563b3fd93c19fd89ff915706f9f6cd5af498f1c7fa1409b4aa2adf150682b4e",
+  "response_bytes": 30276,
+  "stability_probe": {
+    "fetches": 4,
+    "unique_sha256": [
+      "3563b3fd93c19fd89ff915706f9f6cd5af498f1c7fa1409b4aa2adf150682b4e"
+    ],
+    "stable": true
+  },
+  "analysis": {
+    "bytes": 30276,
+    "visible_text_len": 1288,
+    "script_src_count": 4,
+    "script_srcs_sample": [
+      "https://pl.panda.network/js/script.js",
+      "https://sponsors.panda.network/embed/v1/sponsor-bar.js",
+      "https://dock.panda.network/embed/v1/panda-dock.js",
+      "https://i.panda.network/tracker.js"
+    ],
+    "external_link_count": 13,
+    "spa_shell": false,
+    "flag_hits_visible": [],
+    "flag_hits_raw": []
+  },
+  "decision_reason": "stable_homepage_pin_under_triage_ua_homepage_scope_only",
+  "proposed_conclusion": "approve"
+}

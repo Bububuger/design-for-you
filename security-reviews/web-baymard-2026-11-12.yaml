@@ -1,0 +1,87 @@
+# Static security admission review for baymard (web track).
+# Conclusion INSUFFICIENT: snapshot archived for audit only.
+# NOT eligible for automatic live candidate/core admission.
+# Grants no execution/credentials. Do not relabel as approve without
+# a new stable pin + substantive evidence.
+id: web-baymard-2026-11-12
+track: web
+resource_id: baymard
+resource_locator: https://baymard.com/
+reviewed_at: "2026-11-12"
+reviewer:
+  kind: cloud-agent-static-review
+  context: >-
+    Cursor Cloud Agent remediating PR27 under Design For You security
+    admission policy; read-only HTTPS GET via triage.USER_AGENT /
+    triage.fetch_html (resp.text → utf-8 sha256); no HTML/JS execution,
+    no account creation, no form submit; fetched content treated as
+    untrusted text only.
+conclusion: insufficient
+binds_to:
+  content_sha256: 2fd153c509774075606d6338d7219c53db2a443ad4477242ad328e5d249c8e33
+  fetched_url_source: https://baymard.com/
+  fetched_url_final: https://baymard.com/
+  http_status: 200
+  response_bytes: 598276
+  fetched_at: "2026-11-12T03:06:54Z"
+  user_agent: "design-for-you-triage/1.0 (+https://github.com/Bububuger/design-for-you; research)"
+  fetch_mode: "triage.fetch_html:requests.Response.text then sha256(utf-8)"
+  live_pin_stable: false
+  snapshot_archive_only: true
+scope:
+  method: static-fetch-hash-and-read
+  live_admission: ineligible
+  primary_evidence: homepage.html
+  evidence_dir: security-reviews/evidence/baymard/
+  evidence_complete: true
+  covered:
+    - homepage HTML snapshot bytes (security-reviews/evidence/baymard/homepage.html)
+    - fetch metadata (security-reviews/evidence/baymard/fetch.json) recording source/final URL, UA, timestamp, triage fetch mode
+    - visible-text + raw-HTML heuristic scan via scripts/security_admission.py FLAG_PATTERNS (hits require judgment; zero ≠ safe)
+  not_executed:
+    - site JavaScript / bundled SPA runtime
+    - third-party embed scripts
+    - login, signup, form submit, or account creation
+  not_reviewed:
+    - pages beyond the homepage (library, case studies, recordings, paywalls)
+    - runtime/auth/paywall behavior
+  integrity_note: >-
+    Snapshot bytes are archived under evidence_dir for independent
+    audit. Because live_admission=ineligible / conclusion=insufficient,
+    this pack MUST NOT unlock automatic candidate/core writes even if
+    a caller supplies the archived hash.
+findings:
+  - id: F1
+    severity: note
+    category: content_nature
+    judgment: untrusted_reference_only
+    summary: >-
+      Baymard is a third-party design reference site. Pool inclusion would be link-level
+      reference only; content remains untrusted data and grants no execution or access rights.
+  - id: F2
+    severity: note
+    category: keyword_scan
+    judgment: no_hits_not_proof_of_safety
+    summary: >-
+      Repo FLAG_PATTERNS found no authority-override, credential-exfiltration, dangerous-shell,
+      remote-install, or messaging-inducement spans in visible text or raw homepage HTML. Zero
+      keyword hits are NOT proof of safety; they only record that these heuristics did not fire
+      on the committed snapshot.
+  - id: F3
+    severity: medium
+    category: admission_eligibility
+    judgment: live_admission_ineligible
+    summary: >-
+      homepage bytes drift under triage UA (multiple distinct sha256 across probes); cannot
+      honestly claim a stable live pin
+unverified:
+  - Any page beyond the homepage snapshot
+  - Runtime behavior of first-party and third-party JavaScript (not executed)
+  - Future mutations of hosted content after this snapshot
+  - Account, billing, upload, and paywall flows (not exercised)
+  - Hidden prompt / spoofed-authority / exfil content inside unexecuted scripts or post-hydration DOM
+  - UX research guidelines library, premium reports, and account areas
+  - Filter-builder / data-table research pages beyond the homepage
+permissions_granted: []
+trust: untrusted-data
+actual_test_status_observed: not_tested

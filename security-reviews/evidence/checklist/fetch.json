@@ -1,0 +1,32 @@
+{
+  "resource_id": "checklist",
+  "source_url": "https://www.checklist.design/",
+  "final_url": "https://www.checklist.design/",
+  "http_status": 200,
+  "fetched_at": "2026-11-12T03:06:52Z",
+  "user_agent": "design-for-you-triage/1.0 (+https://github.com/Bububuger/design-for-you; research)",
+  "fetch_mode": "triage.fetch_html:requests.Response.text then sha256(utf-8)",
+  "content_sha256": "3ad5a5d0649a5711677fdac789363a68f229c40b2e01045a88c363d5881142e7",
+  "response_bytes": 2033,
+  "stability_probe": {
+    "fetches": 4,
+    "unique_sha256": [
+      "3ad5a5d0649a5711677fdac789363a68f229c40b2e01045a88c363d5881142e7"
+    ],
+    "stable": true
+  },
+  "analysis": {
+    "bytes": 2033,
+    "visible_text_len": 16,
+    "script_src_count": 1,
+    "script_srcs_sample": [
+      "/assets/index-B1OGg8ti.js"
+    ],
+    "external_link_count": 0,
+    "spa_shell": true,
+    "flag_hits_visible": [],
+    "flag_hits_raw": []
+  },
+  "decision_reason": "homepage_is_js_shell_no_substantive_public_checklist_body",
+  "proposed_conclusion": "insufficient"
+}

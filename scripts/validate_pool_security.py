@@ -21,6 +21,9 @@ Rules (web + skill):
     mutations void grandfathering and require review.
   - Approve reviews must have nonempty track-specific binds_to pins.
   - Skill evidence packages re-hash on disk (not hashes.json alone).
+  - Web evidence packs (when declared) re-hash on disk; approve requires a
+    committed primary body whose digest equals binds_to.content_sha256, and
+    rejects empty SPA shells / snapshot-archive labels on approve.
 
 Exit 0 on success; 1 on violations. Does not fetch or execute third-party skills.
 """
@@ -470,6 +473,90 @@ def validate_skill_evidence(reviews: list[dict], root: Path) -> list[str]:
     return errs
 
 
+def validate_web_evidence(reviews: list[dict], root: Path) -> list[str]:
+    """Consistency checks for web review evidence packs.
+
+    - Declared evidence_dir must re-hash on disk (hashes.json is not authority).
+    - approve requires primary body bytes whose digest equals content_sha256.
+    - approve of an empty SPA shell / snapshot-archive label fails closed.
+    - insufficient/block packs may archive evidence; hash consistency still checked.
+    """
+    errs: list[str] = []
+    for rev in reviews:
+        if (rev.get("track") or "").lower() != "web":
+            continue
+        rid = rev.get("id") or "<missing-id>"
+        conclusion = (rev.get("conclusion") or "").lower().strip()
+        scope = rev.get("scope") or {}
+        evidence_rel = scope.get("evidence_dir") or ""
+        binds = rev.get("binds_to") or {}
+
+        if conclusion == "approve":
+            conflict = secu.approve_incompatible_with_snapshot_archive(rev)
+            if conflict:
+                errs.append(f"review {rid}: {conflict}")
+            if not evidence_rel:
+                errs.append(f"review {rid}: web approve requires scope.evidence_dir")
+                continue
+
+        if not evidence_rel:
+            continue
+
+        evidence_dir = root / evidence_rel
+        ok, reason, computed = secu.verify_evidence_file_hashes(evidence_dir)
+        if not ok:
+            errs.append(f"review {rid}: web evidence integrity failed ({reason})")
+            continue
+
+        primary_rel = secu.web_primary_evidence_rel(rev)
+        primary_path = secu.safe_join_under(evidence_dir, primary_rel)
+        if primary_path is None or not primary_path.is_file():
+            errs.append(f"review {rid}: missing primary evidence file {primary_rel}")
+            continue
+        primary_digest = computed.get(primary_rel) or secu.sha256_bytes(
+            primary_path.read_bytes()
+        )
+        body = primary_path.read_text(encoding="utf-8", errors="replace")
+
+        if conclusion == "approve":
+            pin = secu.review_pin(rev, "web")
+            if not pin:
+                errs.append(f"review {rid}: approve missing valid content_sha256")
+            elif pin != primary_digest:
+                errs.append(
+                    f"review {rid}: content_sha256 does not match committed "
+                    f"{primary_rel} bytes"
+                )
+            if secu.looks_like_empty_spa_shell(body):
+                errs.append(
+                    f"review {rid}: spa_shell_not_approvable "
+                    "(homepage shell lacks substantive static body)"
+                )
+            covered = scope.get("covered") or []
+            covered_blob = " ".join(str(c).lower() for c in covered)
+            overbroad_markers = (
+                "full library",
+                "all case studies",
+                "paywall content reviewed",
+                "recordings reviewed",
+                "authenticated area",
+            )
+            if any(m in covered_blob for m in overbroad_markers):
+                errs.append(
+                    f"review {rid}: overbroad_scope_claim_without_matching_evidence"
+                )
+        elif conclusion in {"insufficient", "block"}:
+            # Archive honesty: if a snapshot hash is recorded, it must match bytes.
+            recorded = binds.get("content_sha256")
+            if recorded and secu.is_sha256_hex(str(recorded)):
+                if recorded != primary_digest:
+                    errs.append(
+                        f"review {rid}: archived content_sha256 mismatches "
+                        f"committed {primary_rel}"
+                    )
+    return errs
+
+
 def run(*, base_ref: str | None = None) -> int:
     """Validate pools. Legacy trust = git-derived grandfather only."""
     errors: list[str] = []
@@ -518,6 +605,7 @@ def run(*, base_ref: str | None = None) -> int:
     reviews = secu.load_reviews(reviews_dir)
     errors.extend(validate_reviews(reviews))
     errors.extend(validate_skill_evidence(reviews, ROOT))
+    errors.extend(validate_web_evidence(reviews, ROOT))
 
     for track, path in (("web", ROOT / "sites.yaml"), ("skill", ROOT / "skills.yaml")):
         for entry in load_list(path):

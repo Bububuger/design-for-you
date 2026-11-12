@@ -1,0 +1,35 @@
+{
+  "resource_id": "nicelydone",
+  "source_url": "https://nicelydone.club/",
+  "final_url": "https://nicelydone.club/",
+  "http_status": 200,
+  "fetched_at": "2026-11-12T03:06:46Z",
+  "user_agent": "design-for-you-triage/1.0 (+https://github.com/Bububuger/design-for-you; research)",
+  "fetch_mode": "triage.fetch_html:requests.Response.text then sha256(utf-8)",
+  "content_sha256": "e94329613e6f9827db95a3ae6eaedcaf0d22d41bbce71f1d0e0ec4addfe2d42c",
+  "response_bytes": 153033,
+  "stability_probe": {
+    "fetches": 4,
+    "unique_sha256": [
+      "049b1e6d4f3e19890acff0c0e6413014a27c83e7ff950ab53a8ff5d8d893593c",
+      "1954f4b2245e7f8732101fd72e07b8a2513bc5e9c2dac6da8d0e67a42ee74169",
+      "4a134806172fcfff40fefbd1e57c5cec50d639a152f12b6109387a552b4431c0",
+      "e94329613e6f9827db95a3ae6eaedcaf0d22d41bbce71f1d0e0ec4addfe2d42c"
+    ],
+    "stable": false
+  },
+  "analysis": {
+    "bytes": 153033,
+    "visible_text_len": 3688,
+    "script_src_count": 1,
+    "script_srcs_sample": [
+      "/_nuxt/BnbT79tT.js"
+    ],
+    "external_link_count": 4,
+    "spa_shell": false,
+    "flag_hits_visible": [],
+    "flag_hits_raw": []
+  },
+  "decision_reason": "homepage_bytes_unstable_under_triage_ua_no_live_pin",
+  "proposed_conclusion": "insufficient"
+}

@@ -1,0 +1,93 @@
+# Static security admission review for growth (web track).
+# Conclusion APPROVE binds ONLY to content_sha256 of the committed
+# homepage.html snapshot below (triage fetch convention). Live host
+# drift at intake requires re-review. Grants no execution/credentials.
+id: web-growth-2026-11-12
+track: web
+resource_id: growth
+resource_locator: https://growth.design/
+reviewed_at: "2026-11-12"
+reviewer:
+  kind: cloud-agent-static-review
+  context: >-
+    Cursor Cloud Agent remediating PR27 under Design For You security
+    admission policy; read-only HTTPS GET via triage.USER_AGENT /
+    triage.fetch_html (resp.text → utf-8 sha256); no HTML/JS execution,
+    no account creation, no form submit; fetched content treated as
+    untrusted text only.
+conclusion: approve
+binds_to:
+  content_sha256: fc39a86df78cb6e0e8b171703a8922fb74887ee769c9bca9914cee54e7f670ae
+  fetched_url_source: https://growth.design/
+  fetched_url_final: https://growth.design/
+  http_status: 200
+  response_bytes: 57659
+  fetched_at: "2026-11-12T03:06:56Z"
+  user_agent: "design-for-you-triage/1.0 (+https://github.com/Bububuger/design-for-you; research)"
+  fetch_mode: "triage.fetch_html:requests.Response.text then sha256(utf-8)"
+  live_pin_stable: true
+  snapshot_archive_only: false
+scope:
+  method: static-fetch-hash-and-read
+  live_admission: eligible
+  primary_evidence: homepage.html
+  evidence_dir: security-reviews/evidence/growth/
+  evidence_complete: true
+  covered:
+    - homepage HTML snapshot bytes (security-reviews/evidence/growth/homepage.html)
+    - fetch metadata (security-reviews/evidence/growth/fetch.json) recording source/final URL, UA, timestamp, triage fetch mode
+    - visible-text + raw-HTML heuristic scan via scripts/security_admission.py FLAG_PATTERNS (hits require judgment; zero ≠ safe)
+  not_executed:
+    - site JavaScript / bundled SPA runtime
+    - third-party embed scripts
+    - login, signup, form submit, or account creation
+  not_reviewed:
+    - pages beyond the homepage (library, case studies, recordings, paywalls)
+    - runtime/auth/paywall behavior
+  integrity_note: >-
+    Approval binds to content_sha256 of committed homepage.html, which
+    must equal triage's sha256(utf-8 of Response.text) at intake. CI
+    re-hashes on-disk evidence (not hashes.json alone). Homepage-only
+    scope is intentional; deeper surfaces need separate reviews.
+findings:
+  - id: F1
+    severity: note
+    category: content_nature
+    judgment: untrusted_reference_only
+    summary: >-
+      Growth.Design is a third-party design reference site. Pool inclusion would be link-level
+      reference only; content remains untrusted data and grants no execution or access rights.
+  - id: F2
+    severity: note
+    category: keyword_scan
+    judgment: no_hits_not_proof_of_safety
+    summary: >-
+      Repo FLAG_PATTERNS found no authority-override, credential-exfiltration, dangerous-shell,
+      remote-install, or messaging-inducement spans in visible text or raw homepage HTML. Zero
+      keyword hits are NOT proof of safety; they only record that these heuristics did not fire
+      on the committed snapshot.
+  - id: F3
+    severity: note
+    category: admission_eligibility
+    judgment: homepage_only_bound
+    summary: >-
+      stable homepage pin under triage UA; homepage-only approve
+  - id: F4
+    severity: low
+    category: auth_cta_present
+    judgment: links_not_exercised
+    summary: >-
+      Homepage exposes Sign up with Google/Email and Log in CTAs. Review did not create
+      accounts, submit forms, or follow auth redirects.
+unverified:
+  - Any page beyond the homepage snapshot
+  - Runtime behavior of first-party and third-party JavaScript (not executed)
+  - Future mutations of hosted content after this snapshot
+  - Account, billing, upload, and paywall flows (not exercised)
+  - Hidden prompt / spoofed-authority / exfil content inside unexecuted scripts or post-hydration DOM
+  - Case studies, principles, and masterclass content beyond the homepage
+  - Google/email signup and login flows (links present; not exercised)
+  - Client-side Next.js chunk runtime (/_next/static/...) — not executed
+permissions_granted: []
+trust: untrusted-data
+actual_test_status_observed: not_tested

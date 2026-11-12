@@ -605,6 +605,266 @@ class TestEvidenceIntegrity(unittest.TestCase):
             self.assertIn("missing_evidence_file", reason2)
 
 
+class TestWebEvidenceContract(unittest.TestCase):
+    """Web evidence consistency + negative regressions (fail closed)."""
+
+    def test_committed_web_packs_validate_and_slug_ids_match(self) -> None:
+        reviews = secu.load_reviews(ROOT / "security-reviews")
+        web = [r for r in reviews if (r.get("track") or "").lower() == "web"]
+        self.assertGreaterEqual(len(web), 6)
+        errs = vps.validate_web_evidence(web, ROOT)
+        self.assertEqual(errs, [], errs)
+        # Canonical URL-derived ids (AND match); hyphenated aliases must not be used.
+        expected = {
+            "nicelydone": "insufficient",
+            "collectui": "approve",
+            "pageflows": "insufficient",
+            "checklist": "insufficient",
+            "baymard": "insufficient",
+            "growth": "approve",
+        }
+        by_id = {r["resource_id"]: r for r in web if r.get("resource_id") in expected}
+        self.assertEqual(set(by_id), set(expected))
+        for rid, conclusion in expected.items():
+            rev = by_id[rid]
+            self.assertEqual((rev.get("conclusion") or "").lower(), conclusion)
+            self.assertEqual(triage.slug_id(rev["resource_locator"]), rid)
+            ev = ROOT / (rev.get("scope") or {}).get("evidence_dir", "")
+            self.assertTrue((ev / "homepage.html").is_file(), rid)
+            self.assertTrue((ev / "hashes.json").is_file(), rid)
+            pin = (rev.get("binds_to") or {}).get("content_sha256")
+            self.assertEqual(pin, secu.sha256_bytes((ev / "homepage.html").read_bytes()))
+
+    def test_approve_collectui_and_growth_admit_with_matching_pin_only(self) -> None:
+        for rid, locator in (
+            ("collectui", "https://collectui.com/"),
+            ("growth", "https://growth.design/"),
+        ):
+            rev = secu.find_matching_review(
+                "web", locator=locator, resource_id=rid
+            )
+            self.assertIsNotNone(rev)
+            pin = secu.review_pin(rev, "web")
+            ok = secu.can_write_candidate(
+                "web", locator=locator, resource_id=rid, content_sha256=pin
+            )
+            self.assertTrue(ok.ok, rid)
+            stale = secu.can_write_candidate(
+                "web", locator=locator, resource_id=rid, content_sha256="0" * 64
+            )
+            self.assertFalse(stale.ok)
+            self.assertEqual(stale.status, "stale")
+            missing = secu.can_write_candidate(
+                "web", locator=locator, resource_id=rid, content_sha256=None
+            )
+            self.assertFalse(missing.ok)
+            self.assertEqual(missing.status, "stale")
+
+    def test_insufficient_snapshot_packs_not_live_eligible(self) -> None:
+        for rid, locator in (
+            ("nicelydone", "https://nicelydone.club/"),
+            ("pageflows", "https://pageflows.com/"),
+            ("checklist", "https://www.checklist.design/"),
+            ("baymard", "https://baymard.com/"),
+        ):
+            rev = secu.find_matching_review(
+                "web", locator=locator, resource_id=rid
+            )
+            self.assertIsNotNone(rev, rid)
+            pin = (rev.get("binds_to") or {}).get("content_sha256")
+            adm = secu.can_write_candidate(
+                "web", locator=locator, resource_id=rid, content_sha256=pin
+            )
+            self.assertFalse(adm.ok, rid)
+            self.assertEqual(adm.status, "insufficient", rid)
+
+    def test_wrong_id_or_locator_does_not_match(self) -> None:
+        pin = secu.review_pin(
+            secu.find_matching_review(
+                "web",
+                locator="https://collectui.com/",
+                resource_id="collectui",
+            ),
+            "web",
+        )
+        # Hyphenated alias id must NOT match canonical collectui review.
+        wrong_id = secu.can_write_candidate(
+            "web",
+            locator="https://collectui.com/",
+            resource_id="collect-ui",
+            content_sha256=pin,
+        )
+        self.assertFalse(wrong_id.ok)
+        self.assertEqual(wrong_id.status, "missing")
+        wrong_loc = secu.can_write_candidate(
+            "web",
+            locator="https://evil.example/",
+            resource_id="collectui",
+            content_sha256=pin,
+        )
+        self.assertFalse(wrong_loc.ok)
+        self.assertEqual(wrong_loc.status, "missing")
+
+    def test_absent_evidence_tamper_shell_and_archive_mislabeled(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            reviews = Path(tmp)
+            ev = reviews / "evidence" / "shellsite"
+            ev.mkdir(parents=True)
+            shell = (
+                "<!doctype html><html><body><div id='root'></div>"
+                "<script src='/assets/app.js'></script></body></html>"
+            )
+            (ev / "homepage.html").write_text(shell, encoding="utf-8")
+            digest = secu.sha256_text(shell)
+            (ev / "hashes.json").write_text(
+                json.dumps({"homepage.html": digest}), encoding="utf-8"
+            )
+            # Overbroad SPA-shell approve must fail web evidence validation.
+            _write_review(
+                reviews,
+                {
+                    "id": "web-shell-approve",
+                    "track": "web",
+                    "resource_id": "shellsite",
+                    "resource_locator": "https://shell.example/",
+                    "reviewed_at": "2026-11-12",
+                    "conclusion": "approve",
+                    "binds_to": {
+                        "content_sha256": digest,
+                        "live_pin_stable": True,
+                        "snapshot_archive_only": False,
+                    },
+                    "scope": {
+                        "evidence_dir": "evidence/shellsite",
+                        "primary_evidence": "homepage.html",
+                        "covered": ["homepage shell only"],
+                        "live_admission": "eligible",
+                    },
+                    "permissions_granted": [],
+                    "trust": "untrusted-data",
+                },
+            )
+            errs = vps.validate_web_evidence(secu.load_reviews(reviews), reviews)
+            self.assertTrue(
+                any("spa_shell_not_approvable" in e for e in errs), errs
+            )
+
+            # Absent evidence on approve.
+            _write_review(
+                reviews,
+                {
+                    "id": "web-no-ev",
+                    "track": "web",
+                    "resource_id": "noev",
+                    "resource_locator": "https://noev.example/",
+                    "reviewed_at": "2026-11-12",
+                    "conclusion": "approve",
+                    "binds_to": {"content_sha256": "a" * 64},
+                    "scope": {},
+                    "permissions_granted": [],
+                    "trust": "untrusted-data",
+                },
+            )
+            errs2 = vps.validate_web_evidence(secu.load_reviews(reviews), reviews)
+            self.assertTrue(
+                any("requires scope.evidence_dir" in e for e in errs2), errs2
+            )
+
+            # Tampered bytes vs hashes.json.
+            (ev / "homepage.html").write_text(shell + "<!--x-->", encoding="utf-8")
+            data = yaml.safe_load((reviews / "web-shell-approve.yaml").read_text())
+            data["conclusion"] = "insufficient"
+            data["binds_to"]["snapshot_archive_only"] = True
+            data["binds_to"]["live_pin_stable"] = False
+            data["scope"]["live_admission"] = "ineligible"
+            (reviews / "web-shell-approve.yaml").write_text(
+                yaml.safe_dump(data, sort_keys=False), encoding="utf-8"
+            )
+            errs3 = vps.validate_web_evidence(secu.load_reviews(reviews), reviews)
+            self.assertTrue(any("hash_mismatch" in e for e in errs3), errs3)
+
+            # Snapshot-archive mislabeled as approve is invalid at admission time.
+            bad_approve = {
+                "id": "web-archive-mislabel",
+                "track": "web",
+                "resource_id": "mislabel",
+                "resource_locator": "https://mislabel.example/",
+                "reviewed_at": "2026-11-12",
+                "conclusion": "approve",
+                "binds_to": {
+                    "content_sha256": "b" * 64,
+                    "snapshot_archive_only": True,
+                    "live_pin_stable": False,
+                },
+                "scope": {"live_admission": "ineligible", "evidence_dir": "evidence/x"},
+                "permissions_granted": [],
+                "trust": "untrusted-data",
+            }
+            _write_review(reviews, bad_approve)
+            adm = secu.evaluate_admission(
+                "web",
+                locator="https://mislabel.example/",
+                resource_id="mislabel",
+                content_sha256="b" * 64,
+                reviews_dir=reviews,
+            )
+            self.assertFalse(adm.ok)
+            self.assertEqual(adm.status, "invalid_review")
+            self.assertIn("snapshot_archive", adm.reason)
+
+    def test_spa_shell_helper_and_overbroad_scope_marker(self) -> None:
+        shell = (
+            "<html><body><div id=\"root\"></div>"
+            "<script type=\"module\" src=\"/a.js\"></script></body></html>"
+        )
+        self.assertTrue(secu.looks_like_empty_spa_shell(shell))
+        self.assertFalse(
+            secu.looks_like_empty_spa_shell(
+                "<html><body><h1>Gallery of components and patterns</h1>"
+                + ("x" * 500)
+                + "</body></html>"
+            )
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            reviews = Path(tmp)
+            ev = reviews / "evidence" / "over"
+            ev.mkdir(parents=True)
+            body = "<html><body><h1>Real homepage copy for a gallery</h1>" + (
+                "<p>patterns templates examples</p>" * 40
+            ) + "</body></html>"
+            digest = secu.sha256_text(body)
+            (ev / "homepage.html").write_text(body, encoding="utf-8")
+            (ev / "hashes.json").write_text(
+                json.dumps({"homepage.html": digest}), encoding="utf-8"
+            )
+            _write_review(
+                reviews,
+                {
+                    "id": "web-overbroad",
+                    "track": "web",
+                    "resource_id": "over",
+                    "resource_locator": "https://over.example/",
+                    "reviewed_at": "2026-11-12",
+                    "conclusion": "approve",
+                    "binds_to": {
+                        "content_sha256": digest,
+                        "live_pin_stable": True,
+                        "snapshot_archive_only": False,
+                    },
+                    "scope": {
+                        "evidence_dir": "evidence/over",
+                        "primary_evidence": "homepage.html",
+                        "live_admission": "eligible",
+                        "covered": ["full library and all case studies reviewed"],
+                    },
+                    "permissions_granted": [],
+                    "trust": "untrusted-data",
+                },
+            )
+            errs = vps.validate_web_evidence(secu.load_reviews(reviews), reviews)
+            self.assertTrue(any("overbroad_scope" in e for e in errs), errs)
+
+
 class TestPoolValidatorBypass(unittest.TestCase):
     def setUp(self) -> None:
         self.reviews = ROOT / "security-reviews"

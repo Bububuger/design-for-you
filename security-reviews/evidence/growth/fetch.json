@@ -1,0 +1,43 @@
+{
+  "resource_id": "growth",
+  "source_url": "https://growth.design/",
+  "final_url": "https://growth.design/",
+  "http_status": 200,
+  "fetched_at": "2026-11-12T03:06:56Z",
+  "user_agent": "design-for-you-triage/1.0 (+https://github.com/Bububuger/design-for-you; research)",
+  "fetch_mode": "triage.fetch_html:requests.Response.text then sha256(utf-8)",
+  "content_sha256": "fc39a86df78cb6e0e8b171703a8922fb74887ee769c9bca9914cee54e7f670ae",
+  "response_bytes": 57659,
+  "stability_probe": {
+    "fetches": 4,
+    "unique_sha256": [
+      "fc39a86df78cb6e0e8b171703a8922fb74887ee769c9bca9914cee54e7f670ae"
+    ],
+    "stable": true
+  },
+  "analysis": {
+    "bytes": 57659,
+    "visible_text_len": 715,
+    "script_src_count": 24,
+    "script_srcs_sample": [
+      "/_next/static/immutable/chunks/0580i7sro1hf9.js",
+      "/_next/static/immutable/chunks/0q1w5a3dq7bec.js",
+      "/_next/static/immutable/chunks/2ahc3_qg-jbtu.js",
+      "/_next/static/immutable/chunks/0d8foit5p7wp5.js",
+      "/_next/static/immutable/chunks/turbopack-3h_ctkfaeun7f.js",
+      "/_next/static/immutable/chunks/15tr2cxij1d70.js",
+      "/_next/static/immutable/chunks/3e0d-zb55l8af.js",
+      "/_next/static/immutable/chunks/1m97-503m5oxl.js",
+      "/_next/static/immutable/chunks/0m-869e0bnsb0.js",
+      "/_next/static/immutable/chunks/0upoz7jk10a_h.js",
+      "/_next/static/immutable/chunks/1hg-cs7n1-w-6.js",
+      "/_next/static/immutable/chunks/235kfcpo7f589.js"
+    ],
+    "external_link_count": 0,
+    "spa_shell": false,
+    "flag_hits_visible": [],
+    "flag_hits_raw": []
+  },
+  "decision_reason": "stable_homepage_pin_under_triage_ua_homepage_scope_only",
+  "proposed_conclusion": "approve"
+}
