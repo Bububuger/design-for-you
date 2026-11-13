@@ -1,1 +1,8 @@
-sites: []
+sites:
+- domain: inspora.design
+  url: https://www.inspora.design/
+  reason: landing_freeze
+  rejected_at: '2026-11-13'
+  cooldown_until: '2026-12-31'
+  notes: ordinary landing frozen at intake
+  track: web
