@@ -1,0 +1,200 @@
+# Static security admission review for stitch-skills (google-labs-code/stitch-skills).
+# Conclusion binds ONLY to the pinned git commit and package_integrity_sha256
+# below. Upstream content that diverges requires re-review. Approval grants
+# no execution/credentials/MCP.
+id: skill-stitch-skills-2026-11-16
+track: skill
+resource_id: stitch-skills
+resource_locator: https://github.com/google-labs-code/stitch-skills
+related_locators:
+  - https://github.com/google-labs-code/stitch-skills
+  - https://github.com/google-labs-code/stitch-skills/tree/0337446dadde6f8c94210444e2aa9d546126480f
+reviewed_at: "2026-11-16"
+reviewer:
+  kind: maintainer-static-review
+  context: >-
+    design-for-you feed by Muse (main gate) from GitHub Hot routine output;
+    read-only git clone at the pinned commit for hashing and inspection;
+    scripts NOT executed; plugins NOT installed; no Stitch API key used.
+conclusion: approve
+binds_to:
+  package_integrity_sha256: 99a45a5da8ac2897a44ce7d624348e2c6404c29842749ff6bfd739f6eaad5dee
+  git_commit: 0337446dadde6f8c94210444e2aa9d546126480f
+  file_count: 88
+  skill_md_count: 16
+  integrity_convention: >-
+    sha256 of newline-joined '<sha256>  <path>' lines (sha256sum format) over
+    all 88 files excluding .git, paths sorted; full manifest in evidence.
+scope:
+  method: static-clone-hash-and-read
+  covered:
+    - .agents/plugins/marketplace.json
+    - .github/workflows/validate-skills.yml
+    - .gitignore
+    - CONTRIBUTING.md
+    - LICENSE
+    - README.md
+    - SECURITY.md
+    - plugins/stitch-build/.codex-plugin/plugin.json
+    - plugins/stitch-build/plugin.json
+    - plugins/stitch-build/skills/react-components/README.md
+    - plugins/stitch-build/skills/react-components/SKILL.md
+    - plugins/stitch-build/skills/react-components/examples/gold-standard-card.tsx
+    - plugins/stitch-build/skills/react-components/package-lock.json
+    - plugins/stitch-build/skills/react-components/package.json
+    - plugins/stitch-build/skills/react-components/resources/architecture-checklist.md
+    - plugins/stitch-build/skills/react-components/resources/component-template.tsx
+    - plugins/stitch-build/skills/react-components/resources/stitch-api-reference.md
+    - plugins/stitch-build/skills/react-components/resources/style-guide.json
+    - plugins/stitch-build/skills/react-components/scripts/fetch-stitch.sh
+    - plugins/stitch-build/skills/react-components/scripts/validate.js
+    - plugins/stitch-build/skills/react-native/README.md
+    - plugins/stitch-build/skills/react-native/SKILL.md
+    - plugins/stitch-build/skills/react-native/examples/gold-standard-card.tsx
+    - plugins/stitch-build/skills/react-native/package-lock.json
+    - plugins/stitch-build/skills/react-native/package.json
+    - plugins/stitch-build/skills/react-native/resources/architecture-checklist.md
+    - plugins/stitch-build/skills/react-native/resources/component-template.tsx
+    - plugins/stitch-build/skills/react-native/scripts/fetch-stitch.sh
+    - plugins/stitch-build/skills/react-native/scripts/validate.js
+    - plugins/stitch-build/skills/react-vite-dashboard/README.md
+    - plugins/stitch-build/skills/react-vite-dashboard/SKILL.md
+    - plugins/stitch-build/skills/remotion/README.md
+    - plugins/stitch-build/skills/remotion/SKILL.md
+    - plugins/stitch-build/skills/remotion/examples/WalkthroughComposition.tsx
+    - plugins/stitch-build/skills/remotion/examples/screens.json
+    - plugins/stitch-build/skills/remotion/resources/composition-checklist.md
+    - plugins/stitch-build/skills/remotion/resources/screen-slide-template.tsx
+    - plugins/stitch-build/skills/remotion/scripts/download-stitch-asset.sh
+    - plugins/stitch-build/skills/shadcn-ui/README.md
+    - plugins/stitch-build/skills/shadcn-ui/SKILL.md
+    - plugins/stitch-build/skills/shadcn-ui/examples/auth-layout.tsx
+    - plugins/stitch-build/skills/shadcn-ui/examples/data-table.tsx
+    - plugins/stitch-build/skills/shadcn-ui/examples/form-pattern.tsx
+    - plugins/stitch-build/skills/shadcn-ui/resources/component-catalog.md
+    - plugins/stitch-build/skills/shadcn-ui/resources/customization-guide.md
+    - plugins/stitch-build/skills/shadcn-ui/resources/migration-guide.md
+    - plugins/stitch-build/skills/shadcn-ui/resources/setup-guide.md
+    - plugins/stitch-build/skills/shadcn-ui/scripts/verify-setup.sh
+    - plugins/stitch-design/.codex-plugin/plugin.json
+    - plugins/stitch-design/plugin.json
+    - plugins/stitch-design/skills/code-to-design/SKILL.md
+    - plugins/stitch-design/skills/extract-design-md/SKILL.md
+    - plugins/stitch-design/skills/extract-design-md/examples/DESIGN.md
+    - plugins/stitch-design/skills/extract-design-md/references/angular.md
+    - plugins/stitch-design/skills/extract-design-md/references/plain-css.md
+    - plugins/stitch-design/skills/extract-design-md/references/react-tailwind.md
+    - plugins/stitch-design/skills/extract-design-md/references/svelte.md
+    - plugins/stitch-design/skills/extract-design-md/references/vue.md
+    - plugins/stitch-design/skills/extract-static-html/SKILL.md
+    - plugins/stitch-design/skills/extract-static-html/scripts/extract_inline_html.ts
+    - plugins/stitch-design/skills/extract-static-html/scripts/post_process.ts
+    - plugins/stitch-design/skills/extract-static-html/scripts/snapshot.ts
+    - plugins/stitch-design/skills/generate-design/SKILL.md
+    - plugins/stitch-design/skills/generate-design/examples/enhanced-prompt.md
+    - plugins/stitch-design/skills/generate-design/references/design-mappings.md
+    - plugins/stitch-design/skills/generate-design/references/prompt-keywords.md
+    - plugins/stitch-design/skills/manage-design-system/SKILL.md
+    - plugins/stitch-design/skills/manage-design-system/examples/metadata.json
+    - plugins/stitch-design/skills/manage-design-system/reference/tool-schema.md
+    - plugins/stitch-design/skills/upload-to-stitch/SKILL.md
+    - plugins/stitch-design/skills/upload-to-stitch/scripts/upload_to_stitch.py
+    - plugins/stitch-utilities/.codex-plugin/plugin.json
+    - plugins/stitch-utilities/plugin.json
+    - plugins/stitch-utilities/skills/design-md/README.md
+    - plugins/stitch-utilities/skills/design-md/SKILL.md
+    - plugins/stitch-utilities/skills/design-md/examples/DESIGN.md
+    - plugins/stitch-utilities/skills/enhance-prompt/README.md
+    - plugins/stitch-utilities/skills/enhance-prompt/SKILL.md
+    - plugins/stitch-utilities/skills/enhance-prompt/references/KEYWORDS.md
+    - plugins/stitch-utilities/skills/site-md/SKILL.md
+    - plugins/stitch-utilities/skills/stitch-loop/README.md
+    - plugins/stitch-utilities/skills/stitch-loop/SKILL.md
+    - plugins/stitch-utilities/skills/stitch-loop/examples/SITE.md
+    - plugins/stitch-utilities/skills/stitch-loop/examples/next-prompt.md
+    - plugins/stitch-utilities/skills/stitch-loop/resources/baton-schema.md
+    - plugins/stitch-utilities/skills/stitch-loop/resources/site-template.md
+    - plugins/stitch-utilities/skills/taste-design/SKILL.md
+    - plugins/stitch-utilities/skills/taste-design/resources/DESIGN.md
+  covered_file_count: 88
+  evidence_complete: true
+  not_executed:
+    - plugins/stitch-build/skills/react-components/scripts/fetch-stitch.sh and validate.js
+    - plugins/stitch-build/skills/react-native/scripts/fetch-stitch.sh and validate.js
+    - plugins/stitch-build/skills/remotion/scripts/download-stitch-asset.sh
+    - plugins/stitch-build/skills/shadcn-ui/scripts/verify-setup.sh
+    - plugins/stitch-design/skills/extract-static-html/scripts/extract_inline_html.ts
+    - plugins/stitch-design/skills/upload-to-stitch/scripts/upload_to_stitch.py
+  not_installed:
+    - plugin marketplace install
+    - npm dependencies of the example components
+    - any Stitch API / MCP activation
+  evidence_dir: security-reviews/evidence/stitch-skills/
+  integrity_note: >-
+    Approval binds to git_commit + package_integrity_sha256 of the committed
+    evidence manifest. The upstream repo is mutable; any new commit requires
+    re-review. Evidence vendors hashes for all 88 files plus the
+    security-relevant source files (SKILL.md x16, all scripts, manifests).
+findings:
+  - id: F1
+    severity: note
+    category: fetch_helper_scripts
+    judgment: consistent_with_stated_purpose
+    summary: >-
+      fetch-stitch.sh / download-stitch-asset.sh / extract_inline_html.ts
+      download caller-supplied URLs (Stitch signed export URLs, Google Cloud
+      Storage asset URLs) to caller-supplied local paths via curl / node
+      https. No hardcoded third-party endpoints and no credential handling
+      in these scripts; URL expiry and TLS behaviour are surfaced as errors.
+  - id: F2
+    severity: note
+    category: api_key_transit
+    judgment: consistent_with_official_api_pattern
+    summary: >-
+      upload_to_stitch.py sends the Stitch API key only to the configured
+      Stitch API base URL (default https://stitch.googleapis.com) in the
+      X-Goog-Api-Key header, matching the official Stitch API pattern. No
+      other network destination appears in the script.
+  - id: F3
+    severity: low
+    category: credential_access_pattern
+    judgment: residual_risk_documented_not_blocking
+    summary: >-
+      upload-to-stitch SKILL.md instructs the agent to locate the user's
+      active MCP server configuration file and extract the Stitch API key
+      from it, falling back to asking the user. This is the skill's stated
+      function and, per F2, the key transits only to Google's endpoint; but
+      operators should prefer supplying the key via the --api-key flag or
+      environment rather than agent scraping of config files. This
+      admission grants no credential access.
+  - id: F4
+    severity: note
+    category: local_validation_scripts
+    judgment: benign_local_only
+    summary: >-
+      validate.js performs local AST checks on component files via
+      @swc/core; verify-setup.sh only checks local project config presence
+      (components.json, tailwind config, tsconfig aliases). No network.
+  - id: F5
+    severity: note
+    category: provenance_license
+    judgment: accept_with_attribution
+    summary: >-
+      Apache License 2.0, Copyright Google LLC; the repo ships a SECURITY.md.
+      Package is Google Labs' official Stitch skill collection: 16 skills
+      across the stitch-build and stitch-design plugins.
+unverified:
+  - Runtime behavior of all scripts (static only; not executed)
+  - Stitch API server-side behavior and signed-URL lifecycle
+  - Future mutations of the upstream repository after the pinned commit
+  - npm dependency trees referenced by example package.json files (not installed)
+permissions_granted: []
+trust: untrusted-data
+actual_test_status_observed: not_tested
+notes: >-
+  Fed from the GitHub Hot routine (2026-11-16 issue, new entry
+  google-labs-code/stitch-skills) as a design/UI-generation skill collection
+  for the skill track. Serious unresolved malicious findings were not
+  established under static review. Residual risks (API-key handling pattern,
+  mutable upstream) are documented; actual agent verification remains
+  not_tested.

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# SessionStart hook: puts the using-craft entry skill into the session's context.
+# Adapted from obra/superpowers (MIT, Copyright (c) Jesse Vincent): https://github.com/obra/superpowers
+set -euo pipefail
+
+PLUGIN_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+content=$(cat "${PLUGIN_ROOT}/skills/using-craft/SKILL.md" 2>&1 || echo "Error reading using-craft")
+
+escape_for_json() {
+  local s="$1"
+  s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; s="${s//$'\n'/\\n}"; s="${s//$'\r'/\\r}"; s="${s//$'\t'/\\t}"
+  printf '%s' "$s"
+}
+
+context="<EXTREMELY_IMPORTANT>\nYou have craft, a set of design skills.\n\n**Below is the full content of your 'craft:using-craft' skill. For every other design skill, use the Skill tool:**\n\n$(escape_for_json "$content")\n</EXTREMELY_IMPORTANT>"
+
+# Claude Code reads hookSpecificOutput.additionalContext; Cursor reads additional_context; others the SDK-standard additionalContext.
+if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
+  printf '{\n  "additional_context": "%s"\n}\n' "$context"
+elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -z "${COPILOT_CLI:-}" ]; then
+  printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$context"
+else
+  printf '{\n  "additionalContext": "%s"\n}\n' "$context"
+fi
+exit 0
