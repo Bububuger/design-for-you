@@ -34,8 +34,9 @@
   added_at: '2026-10-30'
 - id: 404s
   name: 404s.design
-  url: https://www.404s.design/
-  aliases: []
+  url: https://404s.design/
+  aliases:
+  - https://www.404s.design/
   status: core
   kind: component
   covers:
@@ -124,19 +125,6 @@
   search_hint: 按品类筛选落地页陈列
   auth: none
   added_at: '2026-10-30'
-- id: lapa-ninja
-  name: Lapa Ninja
-  url: https://www.lapa.ninja/
-  aliases: []
-  status: core
-  kind: landing
-  covers:
-  - landing-page
-  - ai-landing
-  - pricing
-  search_hint: 浏览落地页与 AI 营销页
-  auth: none
-  added_at: '2026-10-30'
 - id: minimal-gallery
   name: Minimal Gallery
   url: https://minimal.gallery/
@@ -200,19 +188,6 @@
   - typography
   - indie-web
   search_hint: 小而干净的整站陈列（超配观察）
-  auth: none
-  added_at: '2026-10-30'
-- id: siteinspire
-  name: SiteInspire
-  url: https://www.siteinspire.com/
-  aliases: []
-  status: core
-  kind: landing
-  covers:
-  - landing-page
-  - editorial
-  - directory-filter
-  search_hint: 按风格/类型筛选网页设计目录（超配观察）
   auth: none
   added_at: '2026-10-30'
 - id: refero-styles

@@ -6,3 +6,15 @@ sites:
   cooldown_until: '2026-12-31'
   notes: ordinary landing frozen at intake
   track: web
+- domain: lapa.ninja
+  url: https://www.lapa.ninja/
+  reason: dead_site
+  rejected_at: '2026-11-16'
+  cooldown_until: '2026-12-31'
+  notes: auto from health fail_streak=3 id=lapa-ninja
+- domain: siteinspire.com
+  url: https://www.siteinspire.com/
+  reason: dead_site
+  rejected_at: '2026-11-16'
+  cooldown_until: '2026-12-31'
+  notes: auto from health fail_streak=3 id=siteinspire

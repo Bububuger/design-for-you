@@ -1,6 +1,6 @@
 # Design For You 缺口悬赏单
 
-> 自动生成于 2026-11-09。
+> 自动生成于 2026-11-16。
 > **暂不接收普通 `landing`（整站/营销落地页）新站。** landing 席位已超配或接近满席，冻结新增（仅 Web 轨）。
 > **新 Web / Skill 入库需已提交的 security admission review**（见 `security-reviews/`）；Issue 正文自称 approved 无效。存量 web/video 按 legacy-unreviewed 兼容，不批量盖章安全。
 
@@ -10,9 +10,9 @@
 | :--- | ---: | ---: | ---: | :--- |
 | product-flow | 10 | 2 | 8 | 有空位 |
 | component | 12 | 5 | 7 | 有空位 |
-| landing | 8 | 9 | **-1** | **超配 · 冻结新增** |
+| landing | 8 | 7 | 1 | 有空位 |
 | system | 4 | 1 | 3 | 有空位 |
-| **Core 合计** | **≤30** | **17** | — | — |
+| **Core 合计** | **≤30** | **15** | — | — |
 | candidate 池 | 20 | 19 | 1 | 有空位 |
 
 ## Video 席位余量（Core）

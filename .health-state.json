@@ -9,13 +9,11 @@
     "navbar-gallery": 0,
     "recent-design": 0,
     "land-book": 0,
-    "lapa-ninja": 2,
     "minimal-gallery": 0,
     "dark-mode-design": 0,
     "dark-design": 0,
     "awwwards": 0,
     "httpster": 0,
-    "siteinspire": 2,
     "refero-styles": 0,
     "uizze": 0,
     "agentic-ux": 0,
@@ -28,7 +26,7 @@
     "awesome-design-md": 0,
     "assistant-ui": 0,
     "screenrove": 0,
-    "designme": 2,
+    "designme": 0,
     "data-table-openstatus": 0,
     "tremor": 0,
     "dashboardblocks": 0,
@@ -37,5 +35,5 @@
     "official-design-md": 0,
     "uxpatterns-empty-states": 0
   },
-  "updated": "2026-11-09"
+  "updated": "2026-11-16"
 }
