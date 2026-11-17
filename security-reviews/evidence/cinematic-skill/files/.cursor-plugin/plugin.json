@@ -1,0 +1,21 @@
+{
+  "name": "cinematic-skill",
+  "version": "1.0.1",
+  "description": "An agent skill for narrated cinematic films built entirely from code: one continuous camera over photos, documents, cards and maps, every stamp, highlight and number landing on the narrator's word. Documentaries, product launches, brand stories, explainers.",
+  "author": {
+    "name": "exploraX"
+  },
+  "homepage": "https://github.com/Moh4696/cinematic-skill",
+  "repository": "https://github.com/Moh4696/cinematic-skill",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "video",
+    "film",
+    "documentary",
+    "explainer",
+    "animation",
+    "motion-graphics",
+    "skia"
+  ]
+}
