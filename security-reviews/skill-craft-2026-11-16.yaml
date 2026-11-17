@@ -1,0 +1,200 @@
+# Static security admission review for craft (diego3g/craft).
+# Conclusion binds ONLY to the pinned git commit and package_integrity_sha256
+# below. Upstream content that diverges requires re-review. Approval grants
+# no execution/credentials/MCP.
+id: skill-craft-2026-11-16
+track: skill
+resource_id: craft
+resource_locator: https://github.com/diego3g/craft
+related_locators:
+  - https://github.com/diego3g/craft
+  - https://github.com/diego3g/craft/tree/49fb28c3bf9a29da6b2fc5050cf31ceefed28779
+reviewed_at: "2026-11-16"
+reviewer:
+  kind: maintainer-static-review
+  context: >-
+    design-for-you feed by Muse (main gate) from Skill HOT / GitHub Hot
+    routine output; read-only git clone at the pinned commit for hashing and
+    inspection; hooks and scripts NOT executed; plugin NOT installed.
+conclusion: approve
+binds_to:
+  package_integrity_sha256: f8632ad66cd738c6923185e48c5edb5fb36181d81666976f5e3c6f9307f36a5a
+  git_commit: 49fb28c3bf9a29da6b2fc5050cf31ceefed28779
+  file_count: 86
+  skill_md_count: 8
+  integrity_convention: >-
+    repo convention (security_admission.package_integrity_from_hashes): sha256 of
+    newline-joined '<path>=<sha256>' lines over the evidence manifest
+    (hashes.json), paths sorted. Evidence holds every UTF-8 text file of the
+    package at the pinned commit (84 files); 2 binary asset(s) are bound by
+    git_commit + the full capture manifest kept in hashes-source.json.
+    Migrated 2026-11-17 from the capture-time sha256sum-style rollup; every
+    per-file sha256 is unchanged and was re-verified against the pinned commit.
+scope:
+  method: static-clone-hash-and-read
+  covered:
+    - .claude-plugin/marketplace.json
+    - .claude-plugin/plugin.json
+    - .gitattributes
+    - .gitignore
+    - LICENSE
+    - README.md
+    - assets/banner.png
+    - assets/social-preview.png
+    - docs/spec-v2.md
+    - docs/spec-v3.md
+    - docs/spec-v4.md
+    - docs/spec.md
+    - examples/craft-critique.md
+    - examples/craft-explore.md
+    - examples/craft-setup.md
+    - examples/craft-states.md
+    - examples/craft-sync.md
+    - examples/craft-system.md
+    - examples/craft.md
+    - hooks/hooks.json
+    - hooks/run-hook.cmd
+    - hooks/session-start
+    - package.json
+    - scripts/check-privacy.mjs
+    - scripts/check.mjs
+    - scripts/checks.mjs
+    - skills/craft-critique/SKILL.md
+    - skills/craft-critique/references/adapters/figma.md
+    - skills/craft-critique/references/adapters/html.md
+    - skills/craft-critique/references/adapters/paper.md
+    - skills/craft-critique/references/rules.md
+    - skills/craft-explore/SKILL.md
+    - skills/craft-explore/references/adapters/figma.md
+    - skills/craft-explore/references/adapters/html.md
+    - skills/craft-explore/references/adapters/paper.md
+    - skills/craft-explore/references/comparison-board.md
+    - skills/craft-explore/references/divergence-axes.md
+    - skills/craft-setup/SKILL.md
+    - skills/craft-setup/references/adapters/figma.md
+    - skills/craft-setup/references/adapters/html.md
+    - skills/craft-setup/references/adapters/paper.md
+    - skills/craft-setup/references/design-md-template.md
+    - skills/craft-setup/references/interview.md
+    - skills/craft-states/SKILL.md
+    - skills/craft-states/references/adapters/figma.md
+    - skills/craft-states/references/adapters/html.md
+    - skills/craft-states/references/adapters/paper.md
+    - skills/craft-states/references/naming-and-sheets.md
+    - skills/craft-states/references/state-catalog.md
+    - skills/craft-sync/SKILL.md
+    - skills/craft-sync/references/adapters/figma.md
+    - skills/craft-sync/references/adapters/html.md
+    - skills/craft-sync/references/adapters/paper.md
+    - skills/craft-sync/references/detect.md
+    - skills/craft-sync/references/export-diff.md
+    - skills/craft-sync/references/inventory.md
+    - skills/craft-system/SKILL.md
+    - skills/craft-system/references/adapters/figma.md
+    - skills/craft-system/references/adapters/html.md
+    - skills/craft-system/references/adapters/paper.md
+    - skills/craft-system/references/audit-checklist.md
+    - skills/craft-system/references/component-anatomy.md
+    - skills/craft-system/references/token-roles.md
+    - skills/craft/SKILL.md
+    - skills/craft/references/adapters/figma.md
+    - skills/craft/references/adapters/html.md
+    - skills/craft/references/adapters/paper.md
+    - skills/using-craft/SKILL.md
+    - test/checks.test.mjs
+    - test/hook.test.mjs
+    - tests/scenarios/craft-critique/baseline.md
+    - tests/scenarios/craft-critique/green.md
+    - tests/scenarios/craft-explore/baseline.md
+    - tests/scenarios/craft-explore/green.md
+    - tests/scenarios/craft-setup/baseline.md
+    - tests/scenarios/craft-setup/green.md
+    - tests/scenarios/craft-states/baseline.md
+    - tests/scenarios/craft-states/green.md
+    - tests/scenarios/craft-sync/baseline.md
+    - tests/scenarios/craft-sync/green.md
+    - tests/scenarios/craft-system/baseline.md
+    - tests/scenarios/craft-system/green.md
+    - tests/scenarios/craft/baseline.md
+    - tests/scenarios/craft/green.md
+    - tests/scenarios/using-craft/baseline.md
+    - tests/scenarios/workflow/runs.md
+  covered_file_count: 86
+  evidence_complete: true
+  not_executed:
+    - hooks/session-start (SessionStart hook)
+    - scripts/check.mjs, scripts/check-privacy.mjs, scripts/checks.mjs
+    - test/hook.test.mjs
+  not_installed:
+    - plugin marketplace install
+    - any MCP activation
+  evidence_dir: security-reviews/evidence/craft/
+  integrity_note: >-
+    Approval binds to git_commit + package_integrity_sha256 of the committed
+    evidence manifest. The upstream repo is mutable; any new commit requires
+    re-review. Evidence vendors hashes for all 86 files plus the
+    security-relevant source files (SKILL.md x8, hooks, scripts, manifests).
+findings:
+  - id: F1
+    severity: note
+    category: session_start_hook
+    judgment: consistent_with_stated_purpose
+    summary: >-
+      hooks/hooks.json registers a SessionStart hook whose script reads only
+      the plugin's own skills/using-craft/SKILL.md and emits it as additional
+      session context (pattern adapted from obra/superpowers, MIT, attributed
+      in-file). No network calls, no reads outside the plugin root, no writes.
+      A SessionStart hook is shell execution at install-and-run time by
+      design of the plugin format; admission covers the pinned snapshot
+      only and grants no execution permission.
+  - id: F2
+    severity: note
+    category: maintainer_tooling_local_only
+    judgment: benign_local_only
+    summary: >-
+      scripts/check.mjs / checks.mjs are local structure validators for
+      contributors. scripts/check-privacy.mjs is the author's pre-push gate:
+      it reads user-configured local files (env CRAFT_DENYLIST,
+      CRAFT_PRIVATE_TOKENS) and prints colour/name collisions only; no
+      network, and it is not wired into install or hooks. test/hook.test.mjs
+      spawns bash only to exercise the hook in tests.
+  - id: F3
+    severity: note
+    category: assertive_workflow_language
+    judgment: scoped_to_own_domain_not_safeguard_override
+    summary: >-
+      using-craft SKILL.md uses emphatic routing language (EXTREMELY-IMPORTANT,
+      'not optional') steering the agent to invoke craft's design skills
+      before design work. The steering is scoped to the plugin's own design
+      domain and its own approval stops; no claim to override host/system
+      safeguards was found. Content remains untrusted data after approval.
+  - id: F4
+    severity: note
+    category: provenance_license
+    judgment: accept_with_attribution
+    summary: >-
+      MIT License (Copyright (c) 2026 Diego Fernandes). Hook files carry
+      in-file attribution to obra/superpowers (MIT). Package is a design
+      skill suite: 7 task skills plus the using-craft entry skill.
+  - id: F5
+    severity: note
+    category: keyword_scan
+    judgment: no_malicious_pattern_found
+    summary: >-
+      Repo-wide heuristic scan found no exfiltration endpoints, no
+      credential/ssh/aws path access, no base64-decode or eval patterns,
+      and no authority-override or jailbreak language.
+unverified:
+  - Runtime behavior of the SessionStart hook and scripts (static only; not executed)
+  - Future mutations of the upstream repository after the pinned commit
+  - Behavior of the Figma / Paper / HTML adapters described in references (text only)
+  - Completeness of upstream license texts beyond the LICENSE copy in the package
+permissions_granted: []
+trust: untrusted-data
+actual_test_status_observed: not_tested
+notes: >-
+  Fed from the Skill HOT routine (2026-11-16 issue) as a design skill suite
+  for the skill track. Serious unresolved malicious findings were not
+  established under static review. Residual risks (hook execution at run
+  time, mutable upstream) are documented; actual agent verification remains
+  not_tested.

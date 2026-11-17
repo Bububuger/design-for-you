@@ -1,0 +1,5 @@
+# Hooks run under bash and sh on every OS: keep LF even on Windows checkouts.
+*.cmd text eol=lf
+hooks/session-start text eol=lf
+*.md text eol=lf
+*.json text eol=lf

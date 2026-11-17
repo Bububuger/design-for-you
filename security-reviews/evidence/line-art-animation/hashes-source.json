@@ -1,0 +1,197 @@
+{
+  "resource_id": "line-art-animation",
+  "repo_url": "https://github.com/JDhruv14/line-art-animation",
+  "git_commit": "c43d698913cf0ad44f984c7ae14c5348010594d3",
+  "captured_at": "2026-11-17",
+  "method": "git clone --depth 1, sha256 per file (excluding .git), package hash over sha256sum-format lines sorted by path",
+  "integrity_convention": "package_integrity_sha256 = sha256 of UTF-8 text formed by lines \"<sha256>  <path>\" (sha256sum format, two spaces), one per file sorted by path, each line terminated by newline",
+  "package_integrity_sha256": "2aa61ce09b3c16a84a0e61a2224488ab1fbc1f95c335a121513561bd885420e2",
+  "file_count": 37,
+  "files": [
+    {
+      "path": ".gitignore",
+      "sha256": "5c95067427674b1468c6568bf79d31abc0c4ae9f3ed07af34d0daf444141626f",
+      "bytes": 46
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "46a7890b47e4734ce4a0d2b83ef3cf6ca5e155f0068f1b284c088aa49c152b45",
+      "bytes": 1065
+    },
+    {
+      "path": "README.md",
+      "sha256": "010521bf1789f9ae37f97ff53d75dbe4e3c113b9b671adfb4be826f5f6220961",
+      "bytes": 5755
+    },
+    {
+      "path": "SKILL.md",
+      "sha256": "b4fcc85ca49f715d36b264167a7dbba26c5b48d49525f61bc29b9375e4edf9a2",
+      "bytes": 6532
+    },
+    {
+      "path": "examples/village/canal.ts",
+      "sha256": "17f302a0f06520a921179fc8e222914db229299c25c40de354a56536e462bc15",
+      "bytes": 10653
+    },
+    {
+      "path": "examples/village/critters.ts",
+      "sha256": "9d81c91f92c71ee2c06d93255f766b9abfa9cdd6d11a28a61140b68f081bb913",
+      "bytes": 15769
+    },
+    {
+      "path": "examples/village/houses.ts",
+      "sha256": "3a8d86d5110819cfa7245847653bb100b2a028a27848e855935919cb8cf3c4c0",
+      "bytes": 30425
+    },
+    {
+      "path": "examples/village/index.html",
+      "sha256": "78fca06eae33e34c1d1155b548935524947bc03724fa6e05933dc0121739940d",
+      "bytes": 1892
+    },
+    {
+      "path": "examples/village/kit.ts",
+      "sha256": "d2ce450d4d5d2619d3d06f883392856b7c775a769b2375702b350877780351d9",
+      "bytes": 2445
+    },
+    {
+      "path": "examples/village/main.ts",
+      "sha256": "8437ba6a534c24c2ffa6d6099f09b8feb9ce166f1428b8727513f492d39ba655",
+      "bytes": 10236
+    },
+    {
+      "path": "examples/village/people.ts",
+      "sha256": "2dcf495e35ac7a72c84b0864a0a7b31950ccd4f571011af8ceb3ab6dd56ad50e",
+      "bytes": 31433
+    },
+    {
+      "path": "examples/village/sky.ts",
+      "sha256": "62edd81eb72ee6d9aba423bdf1db9237fa1857492643c9beafe44fa7700421fe",
+      "bytes": 10184
+    },
+    {
+      "path": "examples/village/tsconfig.json",
+      "sha256": "f8056eaa3bde28a85cba82fa1815a4e844b227431706348a87d0da2f54950ee8",
+      "bytes": 143
+    },
+    {
+      "path": "examples/walker/index.html",
+      "sha256": "2511b15c002022d2e84dc1bd3cc0f09b4e8d89771f6276b55435e44ab0fa35ca",
+      "bytes": 786
+    },
+    {
+      "path": "examples/walker/walker.ts",
+      "sha256": "06ba7826ca4e93cf1b08fac42723d5233383370abd381fdd3543733f6d16579f",
+      "bytes": 6954
+    },
+    {
+      "path": "index.html",
+      "sha256": "4867383181a7ae54bb7dedc31eb483d20e5cccffa653c2d03e24aca9bd2ab6a8",
+      "bytes": 1177
+    },
+    {
+      "path": "lib/daynight.ts",
+      "sha256": "ea5f883475146b79188d30cc1cfb70971c5f2db7e910b1d547f38e8a0ed3863a",
+      "bytes": 3598
+    },
+    {
+      "path": "lib/gait.ts",
+      "sha256": "804750a1d3637831466acd53f764c7c05b9a9ff3e293c9c8eca0695e27b73b5d",
+      "bytes": 6336
+    },
+    {
+      "path": "lib/ink.ts",
+      "sha256": "e95e90f3ab16125d8896356c142d6326713a9abdd29c6ade17008e3fed317956",
+      "bytes": 9803
+    },
+    {
+      "path": "lib/motion.ts",
+      "sha256": "1d5a33261cfc9a23ba7d6e20b2a1c94ae6507814b5843504630bda9a52efe000",
+      "bytes": 3689
+    },
+    {
+      "path": "media/day.png",
+      "sha256": "9a2ed981a819401e3ee169f9da17529ebd95c831eed930e35468f439851befd4",
+      "bytes": 574996
+    },
+    {
+      "path": "media/night.png",
+      "sha256": "bf1e4660212d43eaaeee951e7a60d729534c87cc42891bae1e6270b54624c86d",
+      "bytes": 708329
+    },
+    {
+      "path": "media/village.gif",
+      "sha256": "bbbbfa4974d2340ce5102e80348fd57489b22042917103eb012ac5ee00e9c539",
+      "bytes": 5891018
+    },
+    {
+      "path": "media/walker.gif",
+      "sha256": "f191339a9dc09c3460053e638d3d10583ab5e32c47a742503ba8902da97a8603",
+      "bytes": 247506
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "57a53ffd9289972704760807549c524bcdb3cb0880589727a68a5eca9dcc642a",
+      "bytes": 35961
+    },
+    {
+      "path": "package.json",
+      "sha256": "e3ced97a691f38ef329dd084ee197ebcf06040f8773b7e1cef7b251cf7c6362b",
+      "bytes": 515
+    },
+    {
+      "path": "references/matching.md",
+      "sha256": "bfb884d1d2fb7d1cbade33acb115163370bf360c18211c26e9de8f4cf031a290",
+      "bytes": 2529
+    },
+    {
+      "path": "references/motion.md",
+      "sha256": "bf1e8d32432af400083ea9d6823796c69e53d0c856cd63ec49e3fc4518c19729",
+      "bytes": 4016
+    },
+    {
+      "path": "references/scenes.md",
+      "sha256": "5581f817611c11ff38183790034d24cc4c0776924d445de6ec719b77a38e6881",
+      "bytes": 3619
+    },
+    {
+      "path": "references/style.md",
+      "sha256": "50411b28cfd28784806c1975fe3ab936bf7abfb7a967d1aca91f17ef603aff24",
+      "bytes": 3473
+    },
+    {
+      "path": "references/verify.md",
+      "sha256": "29ac6f52491a9ae1edfafa3882eb0b9437c25790c5dd5a39f5ff5e9ae1bc25b2",
+      "bytes": 2681
+    },
+    {
+      "path": "references/video.md",
+      "sha256": "6a8074c4fa233ce4de105121ae2f509abdbf4e7656a3f514defed103b34796fc",
+      "bytes": 1486
+    },
+    {
+      "path": "scripts/capture.ts",
+      "sha256": "c27da23edfed94ec1f7876c90006a89a480f34a4c04f549d3c448240dccef8d3",
+      "bytes": 5942
+    },
+    {
+      "path": "scripts/clip.ts",
+      "sha256": "cac4ac98516cdcb06e2e65323dda19ec01121ef734c1064fa8bf496aa124f1f1",
+      "bytes": 3596
+    },
+    {
+      "path": "scripts/frames.sh",
+      "sha256": "9d1f7099121fe048c06de4f64900e103c9dfb6e99109725df7c5484e1881e26e",
+      "bytes": 685
+    },
+    {
+      "path": "tsconfig.json",
+      "sha256": "6def3178af590e57f4484f1b67691eb6684e615539cff8429809e25ea7ccf128",
+      "bytes": 421
+    },
+    {
+      "path": "vite.config.ts",
+      "sha256": "90c365029947bcb64267bec822f274faac43417eadc0c5a4dfa96e74937ab9cc",
+      "bytes": 390
+    }
+  ]
+}

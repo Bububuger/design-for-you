@@ -1,0 +1,102 @@
+{
+  "resource_id": "dimensional-drawing",
+  "repo_url": "https://github.com/enesozturk/dimensional-drawing",
+  "git_commit": "5c457437c8c83524308aad3b7443e81adcc13153",
+  "captured_at": "2026-11-17",
+  "method": "git clone --depth 1 of resource_locator, pinned at git_commit; static read + sha256; nothing executed, nothing installed",
+  "integrity_convention": "package_integrity_sha256 = sha256 of the UTF-8 text formed by newline-joined lines '<sha256>  <path>' (sha256sum format) for every file in the repo excluding .git, paths sorted ascending, trailing newline included",
+  "package_integrity_sha256": "bacf05ba0092fd6148eafdd022c57a6c814972488ab29943ad6cee54610108cd",
+  "file_count": 18,
+  "files": [
+    {
+      "path": ".gitignore",
+      "sha256": "ba298f5ccf4954f8fc276661a07c413b2a37893a3492f3530b0ba17af508cc49",
+      "bytes": 54
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "968f8742d25c4982289e8aa65ccc0910e9bf5e40c55f635e81bafbb8e566c207",
+      "bytes": 1068
+    },
+    {
+      "path": "README.md",
+      "sha256": "4b38732c75ed962c4ba3e6b70f210a3bca840591d2d9116905892fbb5ddc3ccf",
+      "bytes": 5222
+    },
+    {
+      "path": "assets/card-sheet.png",
+      "sha256": "a31ee2fa95e16e3f2fc7a5de3498fbf03bdee039f3f0be401a12ba1ada45bcf5",
+      "bytes": 494665
+    },
+    {
+      "path": "assets/dialog-motion.gif",
+      "sha256": "a2f838e98a1d6743698f5bbd6b3dbc95171fbddaf573fdd38b4d8c7e3c9154f0",
+      "bytes": 7320467
+    },
+    {
+      "path": "assets/dialog-motion.mp4",
+      "sha256": "97c6eb19e78f5314654447d6b7c55d3af36adae84a4b52c71000a02a115d23a6",
+      "bytes": 9915941
+    },
+    {
+      "path": "assets/dialog-sheet.png",
+      "sha256": "72fec8c2823f0b5278a8c83483ed7752e9e9e3255931d5fa823e6a79152652a1",
+      "bytes": 676927
+    },
+    {
+      "path": "skills/dimensional-drawing-motion/SKILL.md",
+      "sha256": "51f8b4a500cce6220d8c3375ee2c691ed8153dfb02385b854a685c81fe241e6d",
+      "bytes": 5941
+    },
+    {
+      "path": "skills/dimensional-drawing-motion/adapters/claude-motion.md",
+      "sha256": "4d2e15f48113d1bca9561290a3732edef27c51dabf13fde82280f1eb129199d1",
+      "bytes": 2248
+    },
+    {
+      "path": "skills/dimensional-drawing-motion/adapters/headless/README.md",
+      "sha256": "3b0dcb0a448962f4d5fabd5c239e2cd49a3097b51de1b1f2b87a260141d6d1b6",
+      "bytes": 1601
+    },
+    {
+      "path": "skills/dimensional-drawing-motion/adapters/headless/package.json",
+      "sha256": "bc0cc7ead3331673d7fdd77dcb1af606218bb501fbaf5d1f4b9f4ef6f4b033cb",
+      "bytes": 499
+    },
+    {
+      "path": "skills/dimensional-drawing-motion/adapters/headless/player.html",
+      "sha256": "a669fb52bfaa382e641ccb0a1cf97c8afb8addebc2af6f43e0d86ec83f360d1c",
+      "bytes": 2027
+    },
+    {
+      "path": "skills/dimensional-drawing-motion/adapters/headless/render.mjs",
+      "sha256": "574566beb752eea239ab6ffdd4c28e94a6b4fbbaa92f2db6a015dd78ad4655d0",
+      "bytes": 4033
+    },
+    {
+      "path": "skills/dimensional-drawing-motion/templates/base.css",
+      "sha256": "a0da0401a61fba49b28acef9936a39fab1aeccb174111cc03354669ecd4e89c2",
+      "bytes": 1982
+    },
+    {
+      "path": "skills/dimensional-drawing-motion/templates/scene-dialog.js",
+      "sha256": "bfdea8e98e4b38c22fc334ea7e68ddacd10588d01edc142ae953cf7950d256c9",
+      "bytes": 23949
+    },
+    {
+      "path": "skills/dimensional-drawing/SKILL.md",
+      "sha256": "b4fce1c4556d22734a13f949da9d914df0436d5f2170191f6ec78a879d0ac5ba",
+      "bytes": 8684
+    },
+    {
+      "path": "skills/dimensional-drawing/examples/card-sheet.html",
+      "sha256": "197b7ef3b9deb7e7698c8bbb88812ec446536bcadc4b8d2e07084ac222776fab",
+      "bytes": 23067
+    },
+    {
+      "path": "skills/dimensional-drawing/examples/dialog-sheet.html",
+      "sha256": "6a407cf4f827c4e1996c09eceedc592c8952a4b5a48d0ecef63440a334308ff2",
+      "bytes": 25651
+    }
+  ]
+}

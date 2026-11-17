@@ -1,0 +1,69 @@
+name: Check skill
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Skill loads in every agent, manifests agree, scripts parse
+        run: |
+          npm install --no-save --no-package-lock yaml@2.6.1
+          node tests/check.mjs
+      - name: Installer works in a clean home
+        run: |
+          export HOME="$RUNNER_TEMP/home" && mkdir -p "$HOME/.claude" "$HOME/.codex"
+          bash install.sh
+          test -L "$HOME/.claude/skills/cinematic-film" && test -L "$HOME/.codex/skills/cinematic-film"
+          bash install.sh --uninstall --claude --codex
+          test ! -e "$HOME/.claude/skills/cinematic-film"
+
+  film:
+    # makes a real film from the starter project on Linux: scratch voice, timing, stills, cues, sound, mix, video, captions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ffmpeg, espeak-ng and the Python packages
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg espeak-ng fonts-dejavu-core libgl1 libegl1 libfontconfig1
+          pip install -q -r requirements.txt
+      - name: Setup check
+        run: python skills/cinematic-film/scripts/check_setup.py
+      - name: Starter film, end to end
+        run: |
+          S=skills/cinematic-film/scripts; P="$RUNNER_TEMP/film"
+          python $S/new_project.py "$P"
+          python $S/get_fonts.py --project "$P"
+          test -s "$P/fonts/cond.ttf"
+          python $S/make_beats.py --project "$P"
+          python $S/prep_assets.py --project "$P"
+          python $S/tts_say.py --project "$P"
+          python $S/split_takes.py --project "$P"
+          python $S/build_narration.py --project "$P"
+          python $S/render.py --project "$P" --probe 2,8,14 --size 640x360
+          python $S/render.py --project "$P" --cues
+          python $S/build_sfx.py --project "$P"
+          python $S/mix_soundtrack.py --project "$P"
+          python $S/render.py --project "$P" --t0 0 --t1 6 --size 640x360 --workers 2 --out out/ci.mp4 --audio audio/mix.m4a
+          python $S/burn_captions.py --project "$P" --video out/ci.mp4 --audio audio/mix.m4a --style highlighter --workers 2 --out out/ci_captions.mp4
+          python $S/burn_captions.py --project "$P" --srt-only --out out/ci.srt
+          test -s "$P/out/ci_captions.mp4" && test -s "$P/out/ci.srt" && ls -la "$P/out" "$P/out/probe"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: starter-film
+          path: ${{ runner.temp }}/film/out

@@ -1,0 +1,16 @@
+{
+  "files/.gitignore": "ba298f5ccf4954f8fc276661a07c413b2a37893a3492f3530b0ba17af508cc49",
+  "files/LICENSE": "968f8742d25c4982289e8aa65ccc0910e9bf5e40c55f635e81bafbb8e566c207",
+  "files/README.md": "4b38732c75ed962c4ba3e6b70f210a3bca840591d2d9116905892fbb5ddc3ccf",
+  "files/skills/dimensional-drawing-motion/SKILL.md": "51f8b4a500cce6220d8c3375ee2c691ed8153dfb02385b854a685c81fe241e6d",
+  "files/skills/dimensional-drawing-motion/adapters/claude-motion.md": "4d2e15f48113d1bca9561290a3732edef27c51dabf13fde82280f1eb129199d1",
+  "files/skills/dimensional-drawing-motion/adapters/headless/README.md": "3b0dcb0a448962f4d5fabd5c239e2cd49a3097b51de1b1f2b87a260141d6d1b6",
+  "files/skills/dimensional-drawing-motion/adapters/headless/package.json": "bc0cc7ead3331673d7fdd77dcb1af606218bb501fbaf5d1f4b9f4ef6f4b033cb",
+  "files/skills/dimensional-drawing-motion/adapters/headless/player.html": "a669fb52bfaa382e641ccb0a1cf97c8afb8addebc2af6f43e0d86ec83f360d1c",
+  "files/skills/dimensional-drawing-motion/adapters/headless/render.mjs": "574566beb752eea239ab6ffdd4c28e94a6b4fbbaa92f2db6a015dd78ad4655d0",
+  "files/skills/dimensional-drawing-motion/templates/base.css": "a0da0401a61fba49b28acef9936a39fab1aeccb174111cc03354669ecd4e89c2",
+  "files/skills/dimensional-drawing-motion/templates/scene-dialog.js": "bfdea8e98e4b38c22fc334ea7e68ddacd10588d01edc142ae953cf7950d256c9",
+  "files/skills/dimensional-drawing/SKILL.md": "b4fce1c4556d22734a13f949da9d914df0436d5f2170191f6ec78a879d0ac5ba",
+  "files/skills/dimensional-drawing/examples/card-sheet.html": "197b7ef3b9deb7e7698c8bbb88812ec446536bcadc4b8d2e07084ac222776fab",
+  "files/skills/dimensional-drawing/examples/dialog-sheet.html": "6a407cf4f827c4e1996c09eceedc592c8952a4b5a48d0ecef63440a334308ff2"
+}

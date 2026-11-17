@@ -1,0 +1,215 @@
+# Static security admission review for cinematic-skill (Moh4696/cinematic-skill).
+# Conclusion binds ONLY to the pinned git commit and package_integrity_sha256
+# below. Upstream content that diverges requires re-review. Approval grants
+# no execution/credentials/MCP.
+id: skill-cinematic-skill-2026-11-17
+track: skill
+resource_id: cinematic-skill
+resource_locator: https://github.com/Moh4696/cinematic-skill
+related_locators:
+  - https://github.com/Moh4696/cinematic-skill
+  - https://github.com/Moh4696/cinematic-skill/tree/bf435561c6203f90f971300efe952b68b5ec3417
+reviewed_at: "2026-11-17"
+reviewer:
+  kind: maintainer-static-review
+  context: >-
+    design-for-you feed by Muse (main gate) from Skill HOT routine 2026-11-17;
+    read-only git clone at the pinned commit for hashing and inspection;
+    scripts NOT executed; plugin NOT installed.
+conclusion: approve
+binds_to:
+  package_integrity_sha256: 61a438969542bec724c024040966079e9d86bf41686bcc054c14704460ee3e87
+  git_commit: bf435561c6203f90f971300efe952b68b5ec3417
+  file_count: 50
+  skill_md_count: 1
+  integrity_convention: >-
+    repo convention (security_admission.package_integrity_from_hashes): sha256 of
+    newline-joined '<path>=<sha256>' lines over the evidence manifest
+    (hashes.json), paths sorted. Evidence holds every UTF-8 text file of the
+    package at the pinned commit (47 files); 3 binary asset(s) are bound by
+    git_commit + the full capture manifest kept in hashes-source.json.
+    Migrated 2026-11-17 from the capture-time sha256sum-style rollup; every
+    per-file sha256 is unchanged and was re-verified against the pinned commit.
+scope:
+  method: static-clone-hash-and-read
+  covered:
+    - .agents/plugins/marketplace.json
+    - .claude-plugin/marketplace.json
+    - .codex-plugin/plugin.json
+    - .cursor-plugin/plugin.json
+    - .gitattributes
+    - .github/workflows/check.yml
+    - .gitignore
+    - CHANGELOG.md
+    - LICENSE
+    - PROMPT.md
+    - README.md
+    - examples/film-cold-open.webp
+    - examples/film-explainer.webp
+    - examples/film-wall.webp
+    - gemini-extension.json
+    - install.sh
+    - requirements.txt
+    - skills/cinematic-film/SKILL.md
+    - skills/cinematic-film/agents/openai.yaml
+    - skills/cinematic-film/assets/template/map.json
+    - skills/cinematic-film/assets/template/photos.json
+    - skills/cinematic-film/assets/template/scene.py
+    - skills/cinematic-film/assets/template/script.json
+    - skills/cinematic-film/assets/wright-flyer/map.json
+    - skills/cinematic-film/assets/wright-flyer/photos.json
+    - skills/cinematic-film/assets/wright-flyer/scene.py
+    - skills/cinematic-film/assets/wright-flyer/script.json
+    - skills/cinematic-film/references/archive.md
+    - skills/cinematic-film/references/film.md
+    - skills/cinematic-film/references/performance.md
+    - skills/cinematic-film/references/sound.md
+    - skills/cinematic-film/references/story.md
+    - skills/cinematic-film/references/voice.md
+    - skills/cinematic-film/scripts/build_narration.py
+    - skills/cinematic-film/scripts/build_sfx.py
+    - skills/cinematic-film/scripts/burn_captions.py
+    - skills/cinematic-film/scripts/captions.py
+    - skills/cinematic-film/scripts/check_setup.py
+    - skills/cinematic-film/scripts/engine.py
+    - skills/cinematic-film/scripts/fetch_commons.py
+    - skills/cinematic-film/scripts/get_fonts.py
+    - skills/cinematic-film/scripts/make_beats.py
+    - skills/cinematic-film/scripts/make_map.py
+    - skills/cinematic-film/scripts/mix_soundtrack.py
+    - skills/cinematic-film/scripts/new_project.py
+    - skills/cinematic-film/scripts/prep_assets.py
+    - skills/cinematic-film/scripts/render.py
+    - skills/cinematic-film/scripts/split_takes.py
+    - skills/cinematic-film/scripts/tts_say.py
+    - tests/check.mjs
+  covered_file_count: 50
+  evidence_complete: true
+  not_executed:
+    - all 16 scripts under skills/cinematic-film/scripts/
+    - install.sh
+    - tests/check.mjs
+    - CI workflow .github/workflows/check.yml
+  not_installed:
+    - cinematic-skill plugin (Claude Code / Codex / Cursor / Gemini CLI)
+    - Python requirements (skia-python, numpy, pillow, scipy)
+    - ffmpeg / espeak-ng
+  evidence_dir: security-reviews/evidence/cinematic-skill/
+  integrity_note: >-
+    Approval binds to git_commit + package_integrity_sha256 of the committed
+    evidence manifest. The upstream repo is mutable; any new commit requires
+    re-review. Evidence vendors hashes for all 50 files plus the
+    security-relevant source files (SKILL.md x1, scripts, scene.py files
+    executed by render.py, plugin manifests, install.sh, requirements.txt,
+    tests, LICENSE, README, CI workflow).
+findings:
+  - id: F1
+    severity: note
+    category: credential-access
+    judgment: clean
+    summary: >-
+      No credential access anywhere: full-repo grep finds no reads of ~/.ssh,
+      ~/.aws, .env, keychain, MCP config files, or API keys/tokens/passwords,
+      and no environment-secret handling.
+  - id: F2
+    severity: note
+    category: network-egress
+    judgment: clean
+    summary: >-
+      Network egress is limited to well-known public hosts:
+      commons.wikimedia.org (fetch_commons.py API + image URLs from API
+      responses), raw.githubusercontent.com/google/fonts (get_fonts.py, two
+      pinned font files), cdn.jsdelivr.net/npm (make_map.py default atlas
+      sources). No telemetry, no unknown domains, no exfiltration channel.
+  - id: F3
+    severity: low
+    category: command-execution
+    judgment: noted-by-design
+    summary: >-
+      tts_say.py:76 runs the user-supplied --cmd TTS command with shell=True.
+      Only reachable when the operator explicitly passes --cmd (documented); a
+      malicious --cmd string would execute, but that input is operator-controlled,
+      not remote.
+  - id: F4
+    severity: low
+    category: code-execution-trust-boundary
+    judgment: noted-by-design
+    summary: >-
+      render.py load_scene() executes the project's own scene.py via importlib
+      exec_module. By design (scene.py is user-authored film code), but
+      rendering a project obtained from an untrusted source executes its code;
+      only render trusted projects.
+  - id: F5
+    severity: low
+    category: supply-chain-installer
+    judgment: noted
+    summary: >-
+      install.sh is a curl|bash installer (documented in README) that clones
+      --depth 1 from main with no commit pin and updates via git pull --ff-only;
+      it writes only ~/.cinematic-skill and symlinks into agent skill dirs, with
+      no sudo or privilege escalation. Installing pulls latest main, not the
+      pinned reviewed commit.
+  - id: F6
+    severity: low
+    category: integrity-verification
+    judgment: noted
+    summary: >-
+      get_fonts.py downloads two TTFs from raw.githubusercontent.com/google/fonts
+      with no checksum or signature verification; a compromised or MITM'd
+      response would land unverified font bytes in the project.
+  - id: F7
+    severity: low
+    category: user-supplied-url
+    judgment: noted-by-design
+    summary: >-
+      fetch_commons.py 'url' photo entries and make_map.py 'source' fields
+      download arbitrary URLs taken from the project's own photos.json / map.json
+      with no allowlist; licence for 'url' entries is self-declared by the
+      project author and not verified. Both are operator-supplied project
+      config, not remote input.
+  - id: F8
+    severity: note
+    category: prompt-injection
+    judgment: clean
+    summary: >-
+      No prompt-injection or policy-override language found in SKILL.md,
+      references, scripts, or docs (no 'ignore previous instructions' /
+      override / jailbreak wording). SKILL.md workflow includes four explicit
+      user-approval gates (beat table, look, 30s draft, final voice).
+  - id: F9
+    severity: note
+    category: provenance-license
+    judgment: noted
+    summary: >-
+      MIT License present (Copyright (c) 2026 exploraX). Author is a pseudonymous
+      single maintainer: GitHub Moh4696, self-identified as exploraX, X
+      @exploraX_; repo first released 2026-11-09 (8 days old at review). No
+      SECURITY.md. No package.json (Python-only skill; CI installs yaml@2.6.1
+      ephemerally for tests only). Manifests agree on name cinematic-skill and
+      version 1.0.1.
+  - id: F10
+    severity: note
+    category: plugin-surface
+    judgment: clean
+    summary: >-
+      No hooks, no MCP servers, no background services in any manifest
+      (.claude-plugin/marketplace.json, .codex-plugin/plugin.json,
+      .cursor-plugin/plugin.json, .agents/plugins/marketplace.json,
+      gemini-extension.json, agents/openai.yaml). Plugin surface is the skill
+      files plus the installer only.
+unverified:
+  - Runtime behaviour not tested: no script was executed, nothing installed, no film rendered
+  - engine.py (1566 lines) was pattern-scanned (network, subprocess, file writes, eval/base64/pickle) but not read line by line
+  - Author identity beyond the persistent pseudonym (GitHub Moh4696 / exploraX / X @exploraX_) was not independently verified
+  - Upstream bytes (fonts, atlas JSON, Commons images) were not fetched or checksum-verified during this review
+  - CI workflow (.github/workflows/check.yml) was read but not run
+  - Future mutations of the upstream repository after the pinned commit
+permissions_granted: []
+trust: untrusted-data
+actual_test_status_observed: not_tested
+notes: >-
+  Fed from the Skill HOT routine (2026-11-17) as a design skill candidate for
+  the skill track. Serious unresolved malicious findings were not established
+  under static review. Residual risks (--cmd shell=True by design, render.py
+  executes project scene.py, curl|bash installer unpinned, font downloads
+  unverified) are documented; actual agent verification remains not_tested.

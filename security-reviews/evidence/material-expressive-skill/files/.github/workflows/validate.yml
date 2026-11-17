@@ -1,0 +1,30 @@
+name: Validate skill
+
+on:
+  push:
+    branches:
+      - main
+      - "feat/**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Agent Skill
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate skill metadata and references
+        run: python scripts/validate_skill.py
+
+      - name: Run validator tests
+        run: python -m unittest discover -s tests -v
