@@ -439,25 +439,28 @@ LANDING_POSITIVE_KEYS = (
     "落地页",
 )
 
+# After the field separator, only horizontal whitespace — never `\s*` (which
+# would eat the newline and steal the next line: empty `kind:` →
+# invalid_kind=covers, empty `covers:` → covers=['<!--']).
 EXPLICIT_KIND_RE = re.compile(
     # Underscores allowed (product_flow); normalized to hyphens before allow-list check.
-    r"(?:^|\n)\s*kind\s*[:=]\s*([a-z0-9_-]+)\b",
+    r"(?:^|\n)[ \t]*kind[ \t]*[:=][ \t]*([a-z0-9_-]+)\b",
     re.I,
 )
 EXPLICIT_TRACK_RE = re.compile(
-    r"(?:^|\n)\s*track\s*[:=]\s*(web|video|skill)\b",
+    r"(?:^|\n)[ \t]*track[ \t]*[:=][ \t]*(web|video|skill)\b",
     re.I,
 )
 EXPLICIT_COVERS_RE = re.compile(
-    r"(?:^|\n)\s*covers\s*[:=]\s*\[?([^\n\]]+)\]?",
+    r"(?:^|\n)[ \t]*covers[ \t]*[:=][ \t]*\[?([^\n\]]+)\]?",
     re.I,
 )
 EXPLICIT_LICENSE_NOTE_RE = re.compile(
-    r"(?:^|\n)\s*license_note\s*[:=]\s*(.+)$",
+    r"(?:^|\n)[ \t]*license_note[ \t]*[:=][ \t]*(.+)$",
     re.I | re.M,
 )
 EXPLICIT_NAME_RE = re.compile(
-    r"(?:^|\n)\s*name\s*[:=]\s*([^\n#]+)",
+    r"(?:^|\n)[ \t]*name[ \t]*[:=][ \t]*([^\n#]+)",
     re.I,
 )
 # Literal "PR #None" / "PR #null" from feeders that stringified a missing number.

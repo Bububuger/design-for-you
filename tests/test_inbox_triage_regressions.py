@@ -651,5 +651,44 @@ class TestDocsRetryAndPrNone(unittest.TestCase):
         self.assertIn("PR #None", text)
 
 
+class TestInboxIssueTemplateParse(unittest.TestCase):
+    """Unmodified GitHub issue template must not invent kind/covers."""
+
+    @staticmethod
+    def _template_issue_body() -> str:
+        """Body as GitHub creates it (YAML front matter stripped)."""
+        raw = (
+            ROOT / ".github" / "ISSUE_TEMPLATE" / "inbox.md"
+        ).read_text(encoding="utf-8")
+        if raw.startswith("---"):
+            parts = raw.split("---", 2)
+            if len(parts) >= 3:
+                return parts[2]
+        return raw
+
+    def test_unmodified_template_has_empty_kind_and_covers(self) -> None:
+        body = self._template_issue_body()
+        labels = parse_explicit_labels(body)
+        self.assertEqual(labels.get("track"), "web")
+        self.assertNotIn("kind", labels)
+        self.assertNotIn("invalid_kind", labels)
+        self.assertNotIn("covers", labels)
+        # Guard: template must not pre-fill a concrete kind value.
+        self.assertNotRegex(
+            body,
+            r"(?m)^[ \t]*kind[ \t]*:[ \t]*[a-z0-9_-]+",
+        )
+
+    def test_empty_kind_line_does_not_steal_covers_as_kind(self) -> None:
+        labels = parse_explicit_labels("track: web\nkind:\ncovers: landing\n")
+        self.assertNotIn("kind", labels)
+        self.assertNotIn("invalid_kind", labels)
+        self.assertEqual(labels.get("covers"), ["landing"])
+
+    def test_empty_covers_line_does_not_eat_html_comment(self) -> None:
+        labels = parse_explicit_labels("covers:\n\n<!-- note -->\n")
+        self.assertNotIn("covers", labels)
+
+
 if __name__ == "__main__":
     unittest.main()
