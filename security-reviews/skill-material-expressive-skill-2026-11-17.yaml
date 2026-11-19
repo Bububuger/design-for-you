@@ -1,0 +1,185 @@
+# Static security admission review for material-expressive-skill (asimawdah/material-expressive-skill).
+# Conclusion binds ONLY to the pinned git commit and package_integrity_sha256
+# below. Upstream content that diverges requires re-review. Approval grants
+# no execution/credentials/MCP.
+id: skill-material-expressive-skill-2026-11-17
+track: skill
+resource_id: material-expressive-skill
+resource_locator: https://github.com/asimawdah/material-expressive-skill
+related_locators:
+  - https://github.com/asimawdah/material-expressive-skill
+  - https://github.com/asimawdah/material-expressive-skill/tree/ed134a1966351de013b2652353bbbb20d9d3962a
+reviewed_at: "2026-11-17"
+reviewer:
+  kind: maintainer-static-review
+  context: >-
+    design-for-you feed by Muse (main gate) from Skill HOT routine 2026-11-17;
+    read-only git clone at the pinned commit for hashing and inspection;
+    scripts NOT executed; plugin NOT installed.
+conclusion: approve
+binds_to:
+  package_integrity_sha256: 76c2c9ecc65168cec2298d3752fe87983e89c7e18b91ec62241de03169b47409
+  git_commit: ed134a1966351de013b2652353bbbb20d9d3962a
+  file_count: 24
+  skill_md_count: 1
+  integrity_convention: >-
+    repo convention (security_admission.package_integrity_from_hashes): sha256 of
+    newline-joined '<path>=<sha256>' lines over the evidence manifest
+    (hashes.json), paths sorted. Evidence holds every UTF-8 text file of the
+    package at the pinned commit (23 files) plus hashes-source.json itself.
+    The 1 binary asset(s) are indirectly pinned because hashes-source.json
+    (the full capture manifest including binary digests) is an entry in
+    hashes.json and therefore covered by package_integrity_sha256; git_commit
+    remains the upstream pin. Migrated 2026-11-17 from the capture-time
+    sha256sum-style rollup; every per-file sha256 is unchanged and was
+    re-verified against the pinned commit. hashes-source.json was added to
+    hashes.json on 2026-11-19 so binaries are rollup-protected.
+scope:
+  method: static-clone-hash-and-read
+  covered:
+    - .github/workflows/validate.yml
+    - .gitignore
+    - CHANGELOG.md
+    - CONTRIBUTING.md
+    - LICENSE
+    - README.md
+    - SKILL.md
+    - assets/Introducing-Material-3-Expressive.jpg
+    - assets/expressive_icon.svg
+    - examples/expressive-task-list.md
+    - references/accessibility-and-internationalization.md
+    - references/adaptive-layouts.md
+    - references/components-and-patterns.md
+    - references/design-foundations.md
+    - references/expressive-principles.md
+    - references/implementation-workflow.md
+    - references/motion-and-feedback.md
+    - references/official-sources.md
+    - references/platform-guidance.md
+    - references/review-checklist.md
+    - scripts/validate_skill.py
+    - templates/design-brief.md
+    - templates/implementation-handoff.md
+    - tests/test_validate_skill.py
+  covered_file_count: 24
+  evidence_complete: true
+  not_executed:
+    - scripts/validate_skill.py
+    - tests/test_validate_skill.py
+    - .github/workflows/validate.yml
+  not_installed:
+    - material-expressive-skill (no plugin install, no `npx skills add`, no manual copy into any skills directory)
+  evidence_dir: security-reviews/evidence/material-expressive-skill/
+  integrity_note: >-
+    Approval binds to git_commit + package_integrity_sha256 of the committed
+    evidence manifest. The upstream repo is mutable; any new commit requires
+    re-review. Evidence vendors hashes for all 24 files plus the
+    security-relevant source files (SKILL.md x1, validator, tests, LICENSE,
+    README, CI workflow).
+findings:
+  - id: F1
+    severity: note
+    category: network-exfiltration
+    judgment: clean
+    summary: >-
+      No network calls anywhere in the repo. Grep for curl/wget/fetch/urllib/
+      requests/socket/subprocess/os.system found only urllib.parse (urlsplit/
+      unquote) in scripts/validate_skill.py, used solely to parse local Markdown
+      links. All http(s) URLs in the repo are documentation links
+      (m3.material.io, developer.android.com, w3.org, research.google,
+      agentskills.io, youtu.be, img.shields.io badges); none is fetched by any
+      code.
+  - id: F2
+    severity: note
+    category: code-execution
+    judgment: clean
+    summary: >-
+      The only executable code is scripts/validate_skill.py (stdlib-only:
+      argparse, re, sys, pathlib, urllib.parse) plus its unittest file. No
+      eval/exec/base64/__import__/shell invocation. The validator reads SKILL.md
+      frontmatter and checks local Markdown links, with an explicit
+      _is_inside_root() guard (Path.relative_to) that flags any reference
+      escaping the skill directory. It was read, not executed.
+  - id: F3
+    severity: note
+    category: credential-access
+    judgment: clean
+    summary: >-
+      No credential or secret access. No reads of ~/.ssh, ~/.aws, .env, keychain,
+      MCP config, or environment secrets. The only '.env'/'secrets' hits are
+      lines in the stock Python .gitignore template (.env, .envrc,
+      .streamlit/secrets.toml as ignore entries) and a CONTRIBUTING.md checklist
+      line ('No generated files, secrets, personal data...'). No
+      api-key/token/secret/password handling in code; 'token' hits are all
+      Material design-token terminology.
+  - id: F4
+    severity: note
+    category: prompt-injection
+    judgment: clean
+    summary: >-
+      No prompt-injection or host-policy-override language. Grep for 'ignore
+      previous/disregard/override/system prompt/jailbreak/bypass' found a single
+      benign hit: 'Avoid one-off literals that bypass the theme' (design-token
+      guidance). SKILL.md is conservative throughout: 'Do not invent APIs',
+      'Do not report checks that were not run', 'Preserve the codebase',
+      'Never claim full Material 3 Expressive parity where the platform does
+      not provide it'.
+  - id: F5
+    severity: low
+    category: supply-chain
+    judgment: pass-with-note
+    summary: >-
+      No auto-execution surface: no hooks directory, no plugin.json/
+      marketplace.json, no package.json, no shell scripts. The skill is
+      Markdown guidance plus an opt-in, dependency-free validator. GitHub
+      Actions workflow pins actions/checkout@v4 and actions/setup-python@v5 with
+      minimal permissions (contents: read). README install path ('npx skills add
+      asimawdah/material-expressive-skill' and manual git clone into ~/.codex/
+      ~/.claude skills dirs) is standard Agent Skills installation; the npx
+      route downloads the Skills CLI from npm, which is outside this repository
+      review.
+  - id: F6
+    severity: note
+    category: license-and-identity
+    judgment: clean
+    summary: >-
+      MIT License present (Copyright (c) 2026 Asim Awdah), consistent with
+      SKILL.md frontmatter 'license: MIT' and README badge. Author is GitHub
+      user asimawdah; commit ed134a1966351de013b2652353bbbb20d9d3962a is signed
+      'Asim Awdah <asimawdah.developer@gmail.com>' (2026-11-16). SKILL.md
+      frontmatter name 'material-expressive-skill' matches the repository
+      directory name, version 0.1.0.
+  - id: F7
+    severity: note
+    category: binary-and-asset
+    judgment: clean
+    summary: >-
+      Two binary/static assets: assets/expressive_icon.svg (2,749 B) is a plain
+      static SVG (rect/path shapes only; grep for script/onload/onclick/onerror/
+      javascript/foreignObject found nothing) and
+      assets/Introducing-Material-3-Expressive.jpg (142,710 B, 1280x720 JPEG,
+      JFIF). Neither is referenced by any executable code.
+  - id: F8
+    severity: low
+    category: hygiene
+    judgment: noted
+    summary: >-
+      No SECURITY.md in the repository. Single-maintainer project (asimawdah);
+      no independent reputation check of the author was performed as part of
+      this static review. Neither point is a security defect in the reviewed
+      content, but both are recorded for the gate.
+unverified:
+  - Author reputation / GitHub profile history not checked (static review only)
+  - Validator and unit tests not executed; correctness of scripts/validate_skill.py is judged by reading only
+  - Currency of upstream Material/Android/WCAG claims in references/official-sources.md (review date stated as 2026-11-16) not independently verified
+  - JPEG asset checked by file-type header only; no deep binary parse performed
+  - Future mutations of the upstream repository after the pinned commit
+permissions_granted: []
+trust: untrusted-data
+actual_test_status_observed: not_tested
+notes: >-
+  Fed from the Skill HOT routine (2026-11-17) as a design skill candidate for
+  the skill track. Serious unresolved malicious findings were not established
+  under static review. Residual risks (npx install path outside this repo,
+  single maintainer, no SECURITY.md) are documented; actual agent verification
+  remains not_tested.

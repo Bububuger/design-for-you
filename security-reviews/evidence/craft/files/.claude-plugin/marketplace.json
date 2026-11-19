@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "craft",
+  "description": "Design skills for AI agents.",
+  "owner": {
+    "name": "Diego Fernandes"
+  },
+  "plugins": [
+    {
+      "name": "craft",
+      "description": "A design workflow that starts by itself: setup interview, /craft:craft, states, options, design system and self-critique.",
+      "source": "./",
+      "category": "design"
+    }
+  ]
+}

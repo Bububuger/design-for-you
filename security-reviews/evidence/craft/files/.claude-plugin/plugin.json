@@ -1,0 +1,22 @@
+{
+  "name": "craft",
+  "description": "Design workflow for AI agents: a setup interview and DESIGN.md brief, a /craft:craft front door, full state coverage, three-proposal comparisons, design systems and self-critique. Starts by itself; tool-agnostic (Paper, Figma, HTML).",
+  "version": "0.6.0",
+  "author": {
+    "name": "Diego Fernandes",
+    "url": "https://github.com/diego3g"
+  },
+  "homepage": "https://github.com/diego3g/craft",
+  "repository": "https://github.com/diego3g/craft",
+  "license": "MIT",
+  "keywords": [
+    "design",
+    "design-system",
+    "ui",
+    "states",
+    "critique",
+    "paper",
+    "figma",
+    "skills"
+  ]
+}

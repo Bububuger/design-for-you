@@ -1153,6 +1153,154 @@ class TestPoolValidatorBypass(unittest.TestCase):
         self.assertEqual(vps.run(base_ref=None), 0)
 
 
+class TestSkillGitCommitAndHashesSourcePin(unittest.TestCase):
+    """Pool rows must record reviewed git commits; hashes-source must be rollup-pinned."""
+
+    ADMITTED = (
+        "craft",
+        "stitch-skills",
+        "dimensional-drawing",
+        "line-art-animation",
+        "cinematic-skill",
+        "material-expressive-skill",
+    )
+
+    def test_admitted_skills_bind_commit_and_evidence_path(self) -> None:
+        skills = {
+            row["id"]: row
+            for row in yaml.safe_load((ROOT / "skills.yaml").read_text(encoding="utf-8"))
+        }
+        reviews = {r["resource_id"]: r for r in secu.load_reviews(ROOT / "security-reviews")}
+        for sid in self.ADMITTED:
+            row = skills[sid]
+            rev = reviews[sid]
+            commit = (rev.get("binds_to") or {}).get("git_commit")
+            self.assertTrue(commit, sid)
+            self.assertEqual(vps.entry_git_commit(row), str(commit).lower(), sid)
+            ci = row.get("content_integrity") or {}
+            self.assertTrue(ci.get("file_hashes_path"), sid)
+            self.assertEqual(
+                ci.get("package_integrity"),
+                (rev.get("binds_to") or {}).get("package_integrity_sha256"),
+                sid,
+            )
+            # Purpose tags must not be the triage fallback alone.
+            covers = row.get("covers") or []
+            self.assertTrue(covers, sid)
+            self.assertNotEqual(covers, ["design-skill"], sid)
+            self.assertTrue(row.get("license"), sid)
+            self.assertTrue(row.get("risk_notes"), sid)
+
+    def test_hashes_source_listed_and_integrity_matches(self) -> None:
+        for sid in self.ADMITTED:
+            ev = ROOT / "security-reviews" / "evidence" / sid
+            hashes = json.loads((ev / "hashes.json").read_text(encoding="utf-8"))
+            self.assertIn("hashes-source.json", hashes, sid)
+            digest = secu.sha256_bytes((ev / "hashes-source.json").read_bytes())
+            self.assertEqual(hashes["hashes-source.json"], digest, sid)
+            pin = secu.package_integrity_from_hashes(hashes)
+            rev = next(
+                r
+                for r in secu.load_reviews(ROOT / "security-reviews")
+                if r.get("resource_id") == sid
+            )
+            self.assertEqual(
+                pin, (rev.get("binds_to") or {}).get("package_integrity_sha256"), sid
+            )
+
+    def test_validate_skill_pool_pins_rejects_missing_commit(self) -> None:
+        reviews = secu.load_reviews(ROOT / "security-reviews")
+        craft = next(
+            r
+            for r in yaml.safe_load((ROOT / "skills.yaml").read_text(encoding="utf-8"))
+            if r.get("id") == "craft"
+        )
+        bad = json.loads(json.dumps(craft))  # deep copy via JSON
+        bad["source"] = {
+            k: v for k, v in (bad.get("source") or {}).items() if k != "git_commit"
+        }
+        bad["version_labels"] = {
+            k: v
+            for k, v in (bad.get("version_labels") or {}).items()
+            if k != "git_commit"
+        }
+        errs = vps.validate_skill_pool_pins([bad], reviews, ROOT)
+        self.assertTrue(any("no source.git_commit" in e for e in errs), errs)
+
+    def test_validate_skill_evidence_requires_hashes_source_pin(self) -> None:
+        reviews = [
+            r
+            for r in secu.load_reviews(ROOT / "security-reviews")
+            if r.get("resource_id") == "craft"
+        ]
+        self.assertEqual(vps.validate_skill_evidence(reviews, ROOT), [])
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            # Minimal fake evidence: copy craft hashes but drop hashes-source entry.
+            src = ROOT / "security-reviews/evidence/craft"
+            dst = tmp_path / "evidence" / "craft"
+            dst.mkdir(parents=True)
+            hashes = json.loads((src / "hashes.json").read_text(encoding="utf-8"))
+            hashes.pop("hashes-source.json", None)
+            # Copy only files still listed so verify does not fail on missing paths.
+            for rel in list(hashes):
+                src_file = src / rel
+                if src_file.is_file():
+                    target = dst / rel
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(src_file.read_bytes())
+            (dst / "hashes-source.json").write_bytes(
+                (src / "hashes-source.json").read_bytes()
+            )
+            (dst / "hashes.json").write_text(
+                json.dumps(hashes, indent=2) + "\n", encoding="utf-8"
+            )
+            rev = dict(reviews[0])
+            rev["scope"] = dict(rev.get("scope") or {})
+            rev["scope"]["evidence_dir"] = str(dst.relative_to(tmp_path))
+            # Point root at tmp so evidence_dir resolves under tmp_path.
+            # scope path is relative to repo root in production; here use absolute via root=.
+            # Rebuild review with evidence_dir relative to tmp_path as root.
+            rev["scope"]["evidence_dir"] = "evidence/craft/"
+            # New pin after dropping hashes-source would mismatch; force pin to
+            # recomputed so the only failure is the missing hashes-source listing.
+            new_pin = secu.package_integrity_from_hashes(hashes)
+            rev["binds_to"] = dict(rev.get("binds_to") or {})
+            rev["binds_to"]["package_integrity_sha256"] = new_pin
+            errs = vps.validate_skill_evidence([rev], tmp_path)
+            self.assertTrue(
+                any("hashes-source.json" in e and "not listed" in e for e in errs),
+                errs,
+            )
+
+    def test_stitch_credential_finding_is_medium(self) -> None:
+        rev = yaml.safe_load(
+            (ROOT / "security-reviews/skill-stitch-skills-2026-11-16.yaml").read_text(
+                encoding="utf-8"
+            )
+        )
+        f3 = next(f for f in rev["findings"] if f["id"] == "F3")
+        self.assertEqual(f3["severity"], "medium")
+        blob = f3["summary"].lower()
+        self.assertIn("claude.json", blob)
+        self.assertIn("api-url", blob)
+        self.assertIn("must not scan", blob)
+
+    def test_line_art_unverified_has_no_sessionstart_hook(self) -> None:
+        rev = yaml.safe_load(
+            (
+                ROOT / "security-reviews/skill-line-art-animation-2026-11-17.yaml"
+            ).read_text(encoding="utf-8")
+        )
+        joined = " ".join(rev.get("unverified") or []).lower()
+        self.assertNotIn("sessionstart hook and scripts", joined)
+        self.assertIn("no sessionstart hook", joined)
+
+    def test_skills_yaml_header_keeps_untrusted_comment(self) -> None:
+        head = (ROOT / "skills.yaml").read_text(encoding="utf-8").splitlines()[:5]
+        self.assertTrue(any("untrusted data" in line.lower() for line in head))
+
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -1,0 +1,37 @@
+{
+  "name": "cinematic-skill",
+  "version": "1.0.1",
+  "description": "An agent skill for narrated cinematic films built entirely from code: one continuous camera over photos, documents, cards and maps, every stamp, highlight and number landing on the narrator's word. Documentaries, product launches, brand stories, explainers.",
+  "author": {
+    "name": "exploraX",
+    "url": "https://x.com/exploraX_"
+  },
+  "homepage": "https://github.com/Moh4696/cinematic-skill",
+  "repository": "https://github.com/Moh4696/cinematic-skill",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "video",
+    "film",
+    "documentary",
+    "explainer",
+    "animation",
+    "motion-graphics",
+    "skia"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Cinematic Skill",
+    "shortDescription": "Narrated cinematic films built from code, timed to the voice.",
+    "longDescription": "An agent skill for narrated cinematic films built entirely from code: one continuous camera over photos, documents, cards and maps, every stamp, highlight and number landing on the narrator's word. Documentaries, product launches, brand stories, explainers.",
+    "developerName": "exploraX",
+    "category": "Design",
+    "capabilities": [],
+    "websiteURL": "https://github.com/Moh4696/cinematic-skill",
+    "defaultPrompt": [
+      "Make a 90 second cinematic documentary about the Wright brothers.",
+      "Turn this product launch into a 60 second narrated film.",
+      "Make an explainer video about how coffee gets from cherry to cup."
+    ]
+  }
+}

@@ -1,0 +1,164 @@
+# Static security admission review for dimensional-drawing (enesozturk/dimensional-drawing).
+# Conclusion binds ONLY to the pinned git commit and package_integrity_sha256
+# below. Upstream content that diverges requires re-review. Approval grants
+# no execution/credentials/MCP.
+id: skill-dimensional-drawing-2026-11-17
+track: skill
+resource_id: dimensional-drawing
+resource_locator: https://github.com/enesozturk/dimensional-drawing
+related_locators:
+  - https://github.com/enesozturk/dimensional-drawing
+  - https://github.com/enesozturk/dimensional-drawing/tree/5c457437c8c83524308aad3b7443e81adcc13153
+reviewed_at: "2026-11-17"
+reviewer:
+  kind: maintainer-static-review
+  context: >-
+    design-for-you feed by Muse (main gate) from Skill HOT routine 2026-11-17;
+    read-only git clone at the pinned commit for hashing and inspection;
+    scripts NOT executed; plugin NOT installed.
+conclusion: approve
+binds_to:
+  package_integrity_sha256: c3422c988405cce33f0e061723b8ad50f7a847faf69747ad6768ac6737fcab29
+  git_commit: 5c457437c8c83524308aad3b7443e81adcc13153
+  file_count: 18
+  skill_md_count: 2
+  integrity_convention: >-
+    repo convention (security_admission.package_integrity_from_hashes): sha256 of
+    newline-joined '<path>=<sha256>' lines over the evidence manifest
+    (hashes.json), paths sorted. Evidence holds every UTF-8 text file of the
+    package at the pinned commit (14 files) plus hashes-source.json itself.
+    The 4 binary asset(s) are indirectly pinned because hashes-source.json
+    (the full capture manifest including binary digests) is an entry in
+    hashes.json and therefore covered by package_integrity_sha256; git_commit
+    remains the upstream pin. Migrated 2026-11-17 from the capture-time
+    sha256sum-style rollup; every per-file sha256 is unchanged and was
+    re-verified against the pinned commit. hashes-source.json was added to
+    hashes.json on 2026-11-19 so binaries are rollup-protected.
+scope:
+  method: static-clone-hash-and-read
+  covered:
+    - .gitignore
+    - LICENSE
+    - README.md
+    - assets/card-sheet.png
+    - assets/dialog-motion.gif
+    - assets/dialog-motion.mp4
+    - assets/dialog-sheet.png
+    - skills/dimensional-drawing-motion/SKILL.md
+    - skills/dimensional-drawing-motion/adapters/claude-motion.md
+    - skills/dimensional-drawing-motion/adapters/headless/README.md
+    - skills/dimensional-drawing-motion/adapters/headless/package.json
+    - skills/dimensional-drawing-motion/adapters/headless/player.html
+    - skills/dimensional-drawing-motion/adapters/headless/render.mjs
+    - skills/dimensional-drawing-motion/templates/base.css
+    - skills/dimensional-drawing-motion/templates/scene-dialog.js
+    - skills/dimensional-drawing/SKILL.md
+    - skills/dimensional-drawing/examples/card-sheet.html
+    - skills/dimensional-drawing/examples/dialog-sheet.html
+  covered_file_count: 18
+  evidence_complete: true
+  not_executed:
+    - skills/dimensional-drawing-motion/adapters/headless/render.mjs (headless renderer; spawns ffmpeg, launches Chromium)
+    - skills/dimensional-drawing-motion/templates/scene-dialog.js (scene code, executed only inside the renderer)
+    - skills/dimensional-drawing/examples/card-sheet.html and dialog-sheet.html (inline drawing-kit JS, not run)
+    - package.json postinstall (playwright install chromium, not run)
+  not_installed:
+    - skill copy into ~/.claude/skills
+    - npm install of the headless adapter
+    - any MCP activation
+  evidence_dir: security-reviews/evidence/dimensional-drawing/
+  integrity_note: >-
+    Approval binds to git_commit + package_integrity_sha256 of the committed
+    evidence manifest. The upstream repo is mutable; any new commit requires
+    re-review. Evidence vendors hashes for all 18 files plus the
+    security-relevant source files (SKILL.md x2, headless adapter, templates,
+    example sheets, LICENSE, README).
+findings:
+  - id: F1
+    severity: note
+    category: local_renderer_process_execution
+    judgment: benign_local_only
+    summary: >-
+      adapters/headless/render.mjs is a user-invoked local renderer: it reads
+      a scene JS file and CSS given on the command line, injects them into
+      player.html, screenshots frames in Playwright Chromium, and pipes them
+      to a locally spawned ffmpeg (spawn from node:child_process, binary
+      path overridable via --ffmpeg). It reads only the CHROMIUM_PATH env
+      var. The scene file is executed in the browser page by design, so a
+      malicious --scene argument would run in Chromium; the bundled
+      templates/scene-dialog.js itself only builds SVG (createElementNS,
+      textContent) and contains no network, credential, or filesystem access.
+      No network exfiltration, no credential reads, no reads outside the
+      paths the user passes in.
+  - id: F2
+    severity: note
+    category: install_time_download
+    judgment: standard_dependency_download
+    summary: >-
+      adapters/headless/package.json (private: true, single dependency
+      playwright ^1.47.0, MIT) has a postinstall script "playwright install
+      chromium" that downloads a Chromium binary from Playwright's CDN at
+      npm install time. Standard Playwright behaviour, but it is a network
+      download triggered by install; the adapter is optional (the primary
+      target is the Claude Motion artifact) and was not installed here.
+  - id: F3
+    severity: note
+    category: external_font_fetch
+    judgment: benign_documented_fallback
+    summary: >-
+      The two example sheets and player.html load Arimo from
+      fonts.googleapis.com via a stylesheet link (plus preconnect in the
+      examples). This is a fetch to Google Fonts when the HTML is opened;
+      render.mjs documents that offline it falls back to Helvetica/Arial
+      with the same metrics, and the drawing does not depend on the fetch.
+      No other external URL is fetched by any file.
+  - id: F4
+    severity: note
+    category: inline_html_js
+    judgment: benign_self_contained
+    summary: >-
+      examples/card-sheet.html and dialog-sheet.html are self-contained
+      single-file drawings with inline JS that builds SVG via
+      createElementNS and sets textContent; the only innerHTML use in the
+      repo is player.html's kit.h helper, applied to the scene author's own
+      template strings, not to untrusted input. No fetch/XHR/WebSocket,
+      no eval/Function, no base64 decode, no cookie/localStorage access.
+  - id: F5
+    severity: note
+    category: provenance_license
+    judgment: accept_with_attribution
+    summary: >-
+      MIT License, Copyright (c) 2026 Enes Ozturk. Named author with email
+      in the git history (Enes Ozturk <enesozturk.d@gmail.com>). Repo is a
+      single commit (2026-10-23); no SECURITY.md, no hooks, no plugin or
+      marketplace manifest, no MCP configuration, no test files. Two skills:
+      dimensional-drawing (drawing) and dimensional-drawing-motion
+      (animation). No prompt-injection or safeguard-override language found
+      in either SKILL.md.
+  - id: F6
+    severity: note
+    category: keyword_scan
+    judgment: no_malicious_pattern_found
+    summary: >-
+      Repo-wide scan found no curl/wget/fetch to unknown domains, no
+      credential or secret paths (~/.ssh, ~/.aws, .env files, keychain, MCP
+      configs), no eval/base64-decode patterns, no shell-outside the
+      ffmpeg/Chromium renderer, and no authority-override or jailbreak
+      language. The string ".env" in CSS/HTML is a class name for the
+      shadow-envelope element, not environment-file access.
+unverified:
+  - Runtime behavior of render.mjs / scene-dialog.js / the example sheets (static only; not executed)
+  - Contents of the binary assets (card-sheet.png, dialog-sheet.png, dialog-motion.gif, dialog-motion.mp4) beyond file hashes; not opened or decoded
+  - Future mutations of the upstream repository after the pinned commit
+  - The `npx skills add` install path named in the README (third-party skills.sh CLI, outside this repo)
+  - Completeness of upstream license texts beyond the LICENSE copy in the package
+permissions_granted: []
+trust: untrusted-data
+actual_test_status_observed: not_tested
+notes: >-
+  Fed from the Skill HOT routine (2026-11-17) as a design skill candidate for
+  the skill track. Serious unresolved malicious findings were not established
+  under static review. Residual risks (install-time Chromium download,
+  scene JS executed by the headless renderer by design, Google Fonts fetch
+  in example/player HTML, single-commit history) are documented; actual
+  agent verification remains not_tested.

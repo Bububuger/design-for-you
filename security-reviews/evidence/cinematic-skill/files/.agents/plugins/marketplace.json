@@ -1,0 +1,21 @@
+{
+  "name": "cinematic-skill",
+  "interface": {
+    "displayName": "Cinematic Skill"
+  },
+  "plugins": [
+    {
+      "name": "cinematic-skill",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/Moh4696/cinematic-skill.git",
+        "ref": "main"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Design"
+    }
+  ]
+}

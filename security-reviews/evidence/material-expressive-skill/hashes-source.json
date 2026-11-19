@@ -1,0 +1,132 @@
+{
+  "resource_id": "material-expressive-skill",
+  "repo_url": "https://github.com/asimawdah/material-expressive-skill",
+  "git_commit": "ed134a1966351de013b2652353bbbb20d9d3962a",
+  "captured_at": "2026-11-17",
+  "method": "git clone --depth 1 of resource_locator, pinned at git_commit; static read + sha256; nothing executed, nothing installed",
+  "integrity_convention": "package_integrity_sha256 = sha256 of the UTF-8 text formed by newline-joined lines '<sha256>  <path>' (sha256sum format) for every file in the repo excluding .git, paths sorted ascending, trailing newline included",
+  "package_integrity_sha256": "54b39392e846e71237583e441cf64c85c5c1fe81d9ade874c6fa94bcde505d8d",
+  "file_count": 24,
+  "files": [
+    {
+      "path": ".github/workflows/validate.yml",
+      "sha256": "e557e45af9c2ef4bb43d82f035a8cc146dc1e294639241243792696a9ff4dd47",
+      "bytes": 585
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "114f3cdc2057d610cbc810f69cbc4f195acec0cd15dd54e9b154cf5f6657fc24",
+      "bytes": 4664
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "854c02d97dcceae932439d3f69028b8439804a029edc139c1b89e18ad1350388",
+      "bytes": 673
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "sha256": "00916884f2289ec2949d5451ca88c20e6cec6e04306ba64d12e008eda0b9ca4b",
+      "bytes": 2458
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "59e2a169ac2198c265a61d6db1b5aecdfdc5a37c23dc675fadd778d27d6eada2",
+      "bytes": 1067
+    },
+    {
+      "path": "README.md",
+      "sha256": "579c7351081b1776fb1b0bae41ef98aeb8f2f1a158bdbbbccdb5b267f3c671aa",
+      "bytes": 8667
+    },
+    {
+      "path": "SKILL.md",
+      "sha256": "ae8a3e4f2c25a77c25ca99fe5f4057ed1a80104112ad8bd5d6af9e8cbc184c18",
+      "bytes": 8035
+    },
+    {
+      "path": "assets/Introducing-Material-3-Expressive.jpg",
+      "sha256": "b62825946f30b3e659f53117f3161474bb998bf04698cd76d88d3fac56643938",
+      "bytes": 142710
+    },
+    {
+      "path": "assets/expressive_icon.svg",
+      "sha256": "76fcf56a625fcc0b38f6bd3b8bcd1a5025c91bbde0c6f324900fbe3ce9c57546",
+      "bytes": 2749
+    },
+    {
+      "path": "examples/expressive-task-list.md",
+      "sha256": "eee61c9e15c168eed9602f7c8ffc07f9c4a71ec982eccb641ade0bebc478c64d",
+      "bytes": 3252
+    },
+    {
+      "path": "references/accessibility-and-internationalization.md",
+      "sha256": "f0b04a92adc7f1b48cddd3797ad2f92036c5c4647c7e57ae37568ff48fa3fa21",
+      "bytes": 4973
+    },
+    {
+      "path": "references/adaptive-layouts.md",
+      "sha256": "4bb18032afab4a70f72615c26414766b4e9f1608218dda088be0a3835d74b904",
+      "bytes": 4404
+    },
+    {
+      "path": "references/components-and-patterns.md",
+      "sha256": "0d34a70a8e6a1af377992de1533f48750ec7a41f375d5638bd11b50b91ef9903",
+      "bytes": 5428
+    },
+    {
+      "path": "references/design-foundations.md",
+      "sha256": "4ec936f63ee41fc0014c4a77453b9fa76f3d810b0d8fc5d0e36a07eb140dd76e",
+      "bytes": 4758
+    },
+    {
+      "path": "references/expressive-principles.md",
+      "sha256": "d38963b1a1bee0409ecb36ade4ba11d17d0ee77c5d35de1d1c7cb19814e5d563",
+      "bytes": 5754
+    },
+    {
+      "path": "references/implementation-workflow.md",
+      "sha256": "b6b26df09135c6b886ebc138fd4c348cd44201ec15f4aa6fea3cb66e3de7d3b1",
+      "bytes": 3550
+    },
+    {
+      "path": "references/motion-and-feedback.md",
+      "sha256": "a0194d844084a178f51e1f7bf1ed5582d3dc721be18c9a2e06506dc6dbc92fa3",
+      "bytes": 3711
+    },
+    {
+      "path": "references/official-sources.md",
+      "sha256": "ddc084022e53aee34ea608444eca4d5e2ac8a10336b75395dace032b1ef36b6a",
+      "bytes": 3732
+    },
+    {
+      "path": "references/platform-guidance.md",
+      "sha256": "f9217684307bce8dfcdcd58c261f171e89b9cb1735dbab666b1b1737a96e9a75",
+      "bytes": 4889
+    },
+    {
+      "path": "references/review-checklist.md",
+      "sha256": "fb12741944a8544c34d86a9f2a328846a7a81acaa180b877fd5aa876accd133b",
+      "bytes": 3890
+    },
+    {
+      "path": "scripts/validate_skill.py",
+      "sha256": "7fa178aeb498267378166e89abe54fd7755ec96029e31bfe617fed3818eab4d2",
+      "bytes": 4992
+    },
+    {
+      "path": "templates/design-brief.md",
+      "sha256": "d0042058c0f005e65e991d31ed21506d1ee6c2fef4ee01dc0a1be84300f38383",
+      "bytes": 1195
+    },
+    {
+      "path": "templates/implementation-handoff.md",
+      "sha256": "b8b62babbf73b9e9d77c4ae3137ebf515d140a6025eb3d0db2cfe4b2b62caafa",
+      "bytes": 908
+    },
+    {
+      "path": "tests/test_validate_skill.py",
+      "sha256": "f9fd8a3c93dabb369dbdcc7d6442314d14a29bffb4facafa4b6ada1525215d86",
+      "bytes": 2489
+    }
+  ]
+}
