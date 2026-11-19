@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import security_admission as secu  # noqa: E402
+import triage  # noqa: E402
 from triage import (  # noqa: E402
     INBOX_DEDUP_ANY_MARKERS,
     INBOX_DEDUP_RETRYABLE_MARKERS,
@@ -82,21 +83,33 @@ class TestGithubSlugIdStable(unittest.TestCase):
             "my-craft",
         )
 
-    def test_different_github_repos_do_not_share_id(self) -> None:
+    def test_distinct_repo_slugs_yield_distinct_ids(self) -> None:
+        """Different GitHub *repo names* → different slug ids (not host ``github``)."""
         a = slug_id("https://github.com/assistant-ui/assistant-ui")
         b = slug_id("https://github.com/tremorlabs/tremor")
         self.assertEqual(a, "assistant-ui")
         self.assertEqual(b, "tremor")
         self.assertNotEqual(a, b)
 
+    def test_same_repo_name_different_owners_share_slug_id(self) -> None:
+        """Repo-slug ids collide across owners; write path must fail closed."""
+        self.assertEqual(
+            slug_id("https://github.com/diego3g/craft"),
+            slug_id("https://github.com/other-org/craft"),
+        )
+        self.assertEqual(slug_id("https://github.com/other-org/craft"), "craft")
+
     def test_skill_inbox_without_name_matches_review_resource_id(self) -> None:
-        """Inbox path (no --name) must AND-match a review keyed by repo slug."""
-        locator = "https://github.com/diego3g/craft/"
+        """Inbox path (no --name) must AND-match a review keyed by repo slug.
+
+        Isolated from real skills.yaml / graveyard so pool dupes cannot mask id logic.
+        """
+        locator = "https://github.com/example-owner/craft-fixture/"
         pin = "a" * 64
         review = {
-            "id": "skill-craft-test",
+            "id": "skill-craft-fixture",
             "track": "skill",
-            "resource_id": "craft",
+            "resource_id": "craft-fixture",
             "resource_locator": locator,
             "related_locators": [locator],
             "conclusion": "approve",
@@ -104,63 +117,76 @@ class TestGithubSlugIdStable(unittest.TestCase):
             "reviewed_at": "2026-11-16",
         }
         with tempfile.TemporaryDirectory() as tmp:
-            reviews_dir = Path(tmp)
-            (reviews_dir / "skill-craft-test.yaml").write_text(
+            tmp_path = Path(tmp)
+            reviews_dir = tmp_path / "reviews"
+            reviews_dir.mkdir()
+            (reviews_dir / "skill-craft-fixture.yaml").write_text(
                 yaml.safe_dump(review, sort_keys=False), encoding="utf-8"
             )
-            old = secu.REVIEWS_DIR
+            skills = tmp_path / "skills.yaml"
+            skills.write_text("[]\n", encoding="utf-8")
+            gy = tmp_path / "graveyard.yaml"
+            gy.write_text("sites: []\n", encoding="utf-8")
+            old_reviews, old_skills, old_gy = (
+                secu.REVIEWS_DIR,
+                triage.SKILLS_PATH,
+                triage.GRAVEYARD_PATH,
+            )
             secu.REVIEWS_DIR = reviews_dir
+            triage.SKILLS_PATH = skills
+            triage.GRAVEYARD_PATH = gy
             try:
-                self.assertEqual(slug_id(locator), "craft")
+                self.assertEqual(slug_id(locator), "craft-fixture")
                 result = triage_skill_locator(
                     locator,
                     reason="track: skill\n",
                     name=None,
                     write=False,
                 )
+                self.assertNotEqual(result.get("decision"), "duplicate")
                 draft = result.get("draft") or result.get("entry") or {}
-                self.assertEqual(draft.get("id"), "craft")
+                self.assertEqual(draft.get("id"), "craft-fixture")
                 self.assertNotEqual(draft.get("id"), "github")
                 self.assertEqual(
                     (draft.get("content_integrity") or {}).get("package_integrity"),
                     pin,
                 )
                 matched = secu.find_matching_review(
-                    "skill", locator=locator, resource_id="craft"
+                    "skill", locator=locator, resource_id="craft-fixture"
                 )
                 self.assertIsNotNone(matched)
-                self.assertEqual(matched.get("id"), "skill-craft-test")
-                # Collapsed host id must still fail closed (AND match).
+                self.assertEqual(matched.get("id"), "skill-craft-fixture")
                 self.assertIsNone(
                     secu.find_matching_review(
                         "skill", locator=locator, resource_id="github"
                     )
                 )
-                # With matching id+locator+pin, admission should accept.
                 self.assertEqual(result.get("decision"), "accept_candidate")
                 adm = result.get("security_admission") or {}
                 self.assertTrue(adm.get("ok"))
             finally:
-                secu.REVIEWS_DIR = old
+                secu.REVIEWS_DIR = old_reviews
+                triage.SKILLS_PATH = old_skills
+                triage.GRAVEYARD_PATH = old_gy
 
     def test_two_github_skills_keep_distinct_ids_under_admission(self) -> None:
-        craft = "https://github.com/diego3g/craft/"
-        stitch = "https://github.com/google-labs-code/stitch-skills/"
+        craft = "https://github.com/example-owner/craft-fixture/"
+        stitch = "https://github.com/example-owner/stitch-fixture/"
         pin_c, pin_s = "b" * 64, "c" * 64
         reviews = [
             {
-                "id": "skill-craft-test",
+                "id": "skill-craft-fixture",
                 "track": "skill",
-                "resource_id": "craft",
+                "resource_id": "craft-fixture",
                 "resource_locator": craft,
                 "conclusion": "approve",
                 "binds_to": {"package_integrity_sha256": pin_c},
                 "reviewed_at": "2026-11-16",
             },
             {
-                "id": "skill-stitch-test",
+                "id": "skill-stitch-fixture",
                 "track": "skill",
-                "resource_id": "stitch-skills",
+                "resource_id": "stitch-fixture",
                 "resource_locator": stitch,
                 "conclusion": "approve",
                 "binds_to": {"package_integrity_sha256": pin_s},
@@ -168,34 +194,124 @@ class TestGithubSlugIdStable(unittest.TestCase):
             },
         ]
         with tempfile.TemporaryDirectory() as tmp:
-            reviews_dir = Path(tmp)
+            tmp_path = Path(tmp)
+            reviews_dir = tmp_path / "reviews"
+            reviews_dir.mkdir()
             for rev in reviews:
                 (reviews_dir / f"{rev['id']}.yaml").write_text(
                     yaml.safe_dump(rev, sort_keys=False), encoding="utf-8"
                 )
-            old = secu.REVIEWS_DIR
+            skills = tmp_path / "skills.yaml"
+            skills.write_text("[]\n", encoding="utf-8")
+            gy = tmp_path / "graveyard.yaml"
+            gy.write_text("sites: []\n", encoding="utf-8")
+            old_reviews, old_skills, old_gy = (
+                secu.REVIEWS_DIR,
+                triage.SKILLS_PATH,
+                triage.GRAVEYARD_PATH,
+            )
             secu.REVIEWS_DIR = reviews_dir
+            triage.SKILLS_PATH = skills
+            triage.GRAVEYARD_PATH = gy
             try:
                 r1 = triage_skill_locator(craft, reason="track: skill\n", write=False)
                 r2 = triage_skill_locator(stitch, reason="track: skill\n", write=False)
+                self.assertNotEqual(r1.get("decision"), "duplicate")
+                self.assertNotEqual(r2.get("decision"), "duplicate")
                 id1 = (r1.get("draft") or r1.get("entry") or {}).get("id")
                 id2 = (r2.get("draft") or r2.get("entry") or {}).get("id")
-                self.assertEqual(id1, "craft")
-                self.assertEqual(id2, "stitch-skills")
+                self.assertEqual(id1, "craft-fixture")
+                self.assertEqual(id2, "stitch-fixture")
                 self.assertNotEqual(id1, id2)
-                # Cross-wiring locator to the other review's id must not match.
                 self.assertIsNone(
                     secu.find_matching_review(
-                        "skill", locator=craft, resource_id="stitch-skills"
+                        "skill", locator=craft, resource_id="stitch-fixture"
                     )
                 )
                 self.assertIsNone(
                     secu.find_matching_review(
-                        "skill", locator=stitch, resource_id="craft"
+                        "skill", locator=stitch, resource_id="craft-fixture"
                     )
                 )
             finally:
-                secu.REVIEWS_DIR = old
+                secu.REVIEWS_DIR = old_reviews
+                triage.SKILLS_PATH = old_skills
+                triage.GRAVEYARD_PATH = old_gy
+
+    def test_same_slug_different_owner_write_duplicate_id_needs_human(self) -> None:
+        """Second GitHub repo with same name cannot steal / collide into the pool."""
+        first = "https://github.com/owner-a/shared-skill/"
+        second = "https://github.com/owner-b/shared-skill/"
+        pin = "d" * 64
+        review_a = {
+            "id": "skill-shared-a",
+            "track": "skill",
+            "resource_id": "shared-skill",
+            "resource_locator": first,
+            "conclusion": "approve",
+            "binds_to": {"package_integrity_sha256": pin},
+            "reviewed_at": "2026-11-16",
+        }
+        review_b = {
+            "id": "skill-shared-b",
+            "track": "skill",
+            "resource_id": "shared-skill",
+            "resource_locator": second,
+            "conclusion": "approve",
+            "binds_to": {"package_integrity_sha256": pin},
+            "reviewed_at": "2026-11-16",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            reviews_dir = tmp_path / "reviews"
+            reviews_dir.mkdir()
+            for rev in (review_a, review_b):
+                (reviews_dir / f"{rev['id']}.yaml").write_text(
+                    yaml.safe_dump(rev, sort_keys=False), encoding="utf-8"
+                )
+            skills = tmp_path / "skills.yaml"
+            skills.write_text("[]\n", encoding="utf-8")
+            gy = tmp_path / "graveyard.yaml"
+            gy.write_text("sites: []\n", encoding="utf-8")
+            status = tmp_path / "STATUS.md"
+            status.write_text("# status\n", encoding="utf-8")
+            old = (
+                secu.REVIEWS_DIR,
+                triage.SKILLS_PATH,
+                triage.GRAVEYARD_PATH,
+                triage.STATUS_PATH,
+            )
+            secu.REVIEWS_DIR = reviews_dir
+            triage.SKILLS_PATH = skills
+            triage.GRAVEYARD_PATH = gy
+            triage.STATUS_PATH = status
+            try:
+                r1 = triage_skill_locator(
+                    first, reason="track: skill\n", write=True
+                )
+                self.assertEqual(r1.get("decision"), "accept_candidate")
+                self.assertEqual((r1.get("entry") or {}).get("id"), "shared-skill")
+                r2 = triage_skill_locator(
+                    second, reason="track: skill\n", write=True
+                )
+                # Locator differs → not URL-duplicate; id collides → fail closed.
+                self.assertEqual(r2.get("decision"), "needs_human")
+                self.assertIn("duplicate_id", r2.get("write_error") or "")
+                pool = yaml.safe_load(skills.read_text(encoding="utf-8")) or []
+                self.assertEqual(len(pool), 1)
+                self.assertEqual(pool[0].get("id"), "shared-skill")
+                self.assertTrue(
+                    (pool[0].get("source") or {}).get("install_locator", "").startswith(
+                        "https://github.com/owner-a/"
+                    )
+                )
+            finally:
+                (
+                    secu.REVIEWS_DIR,
+                    triage.SKILLS_PATH,
+                    triage.GRAVEYARD_PATH,
+                    triage.STATUS_PATH,
+                ) = old
 
 
 class TestInvalidKindFailClosed(unittest.TestCase):
@@ -208,6 +324,15 @@ class TestInvalidKindFailClosed(unittest.TestCase):
         self.assertNotIn("kind", labels)
         self.assertEqual(labels.get("invalid_kind"), "gallery")
         self.assertEqual(labels.get("covers"), ["landing", "branding"])
+
+    def test_underscore_kind_normalizes_not_silently_dropped(self) -> None:
+        labels = parse_explicit_labels("kind: product_flow\ncovers: onboarding\n")
+        self.assertEqual(labels.get("kind"), "product-flow")
+        self.assertNotIn("invalid_kind", labels)
+        # Truly unknown underscore form still surfaces as invalid_kind.
+        bad = parse_explicit_labels("kind: not_a_real_kind\n")
+        self.assertEqual(bad.get("invalid_kind"), "not-a-real-kind")
+        self.assertNotIn("kind", bad)
 
     @patch("triage.llm_covers_and_hint", return_value=None)
     @patch("triage.fetch_html", return_value=(SAMPLE_HTML, 200, None))
@@ -312,11 +437,22 @@ class TestInboxWorkflowDedup(unittest.TestCase):
             "🚫 当前冻结普通 landing 新站（Web 轨；见 STATUS.md）。",
             "🚫 **rejected_security_blocked**：存在 conclusion=block",
             "🚫 非白名单作者。本仓 inbox 仅接受维护者 / 授权 Bot 投喂。已关闭。",
+            "🚫 未找到 URL。请把完整 URL 放在标题或正文。",
         ):
             self.assertTrue(
                 inbox_dedup_should_skip("reopened", [body]),
                 body,
             )
+
+    def test_no_url_and_triage_other_comments_have_dedup_markers(self) -> None:
+        no_url = build_inbox_comment({"decision": "rejected_no_url"})
+        self.assertIn("🚫 未找到 URL", no_url)
+        self.assertTrue(inbox_dedup_should_skip("labeled", [no_url]))
+        other = build_inbox_comment({"decision": "weird", "track": "web"})
+        self.assertIn("📋 **triage_other**", other)
+        self.assertTrue(inbox_dedup_should_skip("labeled", [other]))
+        # Unknown conclusions remain retryable on reopen.
+        self.assertFalse(inbox_dedup_should_skip("reopened", [other]))
 
     def test_broad_ban_emoji_alone_is_not_terminal_on_reopen(self) -> None:
         # Narrow 🚫 matching: a random ban-emoji comment must not block retry.
@@ -419,6 +555,11 @@ class TestPrNoneNeverEmitted(unittest.TestCase):
         self.assertNotIn("#None", cleaned)
         self.assertIn("web-inspora-2026-11-11", cleaned)
 
+    def test_strip_does_not_rewrite_unrelated_jian_paren(self) -> None:
+        # Narrowed strip: must not globally rewrite every 「见（」.
+        raw = "详见（手册）。另见（附录）。"
+        self.assertEqual(strip_pr_none_mentions(raw), raw)
+
     def test_inbox_comment_strips_pr_none_in_json_fallback(self) -> None:
         comment = build_inbox_comment(
             {
@@ -429,6 +570,64 @@ class TestPrNoneNeverEmitted(unittest.TestCase):
         )
         self.assertNotIn("PR #None", comment)
         self.assertNotIn("#None", comment)
+        self.assertIn("📋 **triage_other**", comment)
+
+    def test_skill_search_hint_strips_pr_none_before_pool_write(self) -> None:
+        locator = "https://github.com/example-owner/hint-skill/"
+        pin = "e" * 64
+        review = {
+            "id": "skill-hint",
+            "track": "skill",
+            "resource_id": "hint-skill",
+            "resource_locator": locator,
+            "conclusion": "approve",
+            "binds_to": {"package_integrity_sha256": pin},
+            "reviewed_at": "2026-11-16",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            reviews_dir = tmp_path / "reviews"
+            reviews_dir.mkdir()
+            (reviews_dir / "skill-hint.yaml").write_text(
+                yaml.safe_dump(review, sort_keys=False), encoding="utf-8"
+            )
+            skills = tmp_path / "skills.yaml"
+            skills.write_text("[]\n", encoding="utf-8")
+            gy = tmp_path / "graveyard.yaml"
+            gy.write_text("sites: []\n", encoding="utf-8")
+            status = tmp_path / "STATUS.md"
+            status.write_text("# status\n", encoding="utf-8")
+            old = (
+                secu.REVIEWS_DIR,
+                triage.SKILLS_PATH,
+                triage.GRAVEYARD_PATH,
+                triage.STATUS_PATH,
+            )
+            secu.REVIEWS_DIR = reviews_dir
+            triage.SKILLS_PATH = skills
+            triage.GRAVEYARD_PATH = gy
+            triage.STATUS_PATH = status
+            try:
+                reason = (
+                    "track: skill\n"
+                    "配套 security review 见 PR #None（skill-hint）。\n"
+                )
+                result = triage_skill_locator(
+                    locator, reason=reason, write=True
+                )
+                self.assertEqual(result.get("decision"), "accept_candidate")
+                entry = result.get("entry") or {}
+                self.assertNotIn("PR #None", entry.get("search_hint") or "")
+                pool = yaml.safe_load(skills.read_text(encoding="utf-8")) or []
+                self.assertEqual(len(pool), 1)
+                self.assertNotIn("PR #None", pool[0].get("search_hint") or "")
+            finally:
+                (
+                    secu.REVIEWS_DIR,
+                    triage.SKILLS_PATH,
+                    triage.GRAVEYARD_PATH,
+                    triage.STATUS_PATH,
+                ) = old
 
 
 class TestParseNameLabel(unittest.TestCase):
@@ -436,6 +635,20 @@ class TestParseNameLabel(unittest.TestCase):
         labels = parse_explicit_labels("track: skill\nname: craft\n")
         self.assertEqual(labels.get("name"), "craft")
         self.assertEqual(labels.get("track"), "skill")
+
+
+class TestDocsRetryAndPrNone(unittest.TestCase):
+    def test_readme_documents_reopen_retry_and_no_pr_none(self) -> None:
+        text = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("先关闭再重开", text)
+        self.assertIn("PR #None", text)
+
+    def test_issue_template_documents_reopen_and_pr_none(self) -> None:
+        text = (
+            ROOT / ".github" / "ISSUE_TEMPLATE" / "inbox.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("先关闭再重开", text)
+        self.assertIn("PR #None", text)
 
 
 if __name__ == "__main__":

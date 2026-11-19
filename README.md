@@ -79,12 +79,14 @@ STATUS.md 悬赏单 ──► Grok Bot / PA / 手机投喂
 1. 读根目录 [`STATUS.md`](./STATUS.md)：看哪个品类缺站、悬赏词、是否冻结 landing。  
 2. 开 Issue：  
    - **标题**：完整 URL（如 `https://example.com/`）  
-   - **标签**：`inbox`  
+   - **标签**：`inbox`（也可只把 URL 放标题、不贴 label；Actions 会自动补 `inbox`）  
    - **正文**：推荐原因；可选写观察到的 `covers`（如 `data-table, filter-builder`）  
    - **视频轨**：正文加 `track: video` 与 `kind: launch-demo`（或 `ui-motion` / `storyboard` / `gen-style`）；无 `track` 默认 web  
    - **技能轨**：正文加 `track: skill`；标题=install locator；须仓库内已有绑定完整性的 review  
+   - **配套审查引用**：有 PR 号时用 `scripts/triage.py` 的 `format_security_review_cite(review_id, pr)`；**没有 PR 号就不要写 `PR #None`**，只写审查文件名即可  
 3. 只需仓库 **Issues: Read & Write**（公开仓）；不要直接改 YAML。  
-4. Actions 会评论结论并关单。非白名单作者的 Issue 会被拒绝关闭。
+4. Actions 会评论结论并关单。非白名单作者的 Issue 会被拒绝关闭。  
+5. **重试**：若结论是 `needs_human` / `pending_security_review` / 非法 kind，补完审查或改正文后须**先关闭再重开** Issue，才会再次跑 triage（仅贴评论或保持 open 不会重跑）。
 
 ## 白名单与 Secrets
 

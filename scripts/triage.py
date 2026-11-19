@@ -440,7 +440,8 @@ LANDING_POSITIVE_KEYS = (
 )
 
 EXPLICIT_KIND_RE = re.compile(
-    r"(?:^|\n)\s*kind\s*[:=]\s*([a-z0-9-]+)\b",
+    # Underscores allowed (product_flow); normalized to hyphens before allow-list check.
+    r"(?:^|\n)\s*kind\s*[:=]\s*([a-z0-9_-]+)\b",
     re.I,
 )
 EXPLICIT_TRACK_RE = re.compile(
@@ -502,7 +503,8 @@ def parse_explicit_labels(reason: str, track: str | None = None) -> dict[str, An
     allowed = kinds_for_track(resolved_track)
     km = EXPLICIT_KIND_RE.search(reason)
     if km:
-        kind = km.group(1).lower()
+        # Normalize product_flow → product-flow so underscore forms are not dropped.
+        kind = km.group(1).lower().replace("_", "-")
         if kind in allowed:
             out["kind"] = kind
         else:
@@ -535,7 +537,7 @@ def format_pr_ref(pr_number: int | str | None) -> str:
 
     Feeders that do ``f\"PR #{pr}\"`` with ``pr is None`` produce the literal
     ``PR #None`` — never emit that. Callers should omit the phrase entirely
-    when this returns empty.
+    when this returns empty. Used by ``format_security_review_cite`` (PA 投喂).
     """
     if pr_number is None:
         return ""
@@ -554,7 +556,11 @@ def format_pr_ref(pr_number: int | str | None) -> str:
 def format_security_review_cite(
     review_id: str, pr_number: int | str | None = None
 ) -> str:
-    """Human-readable pointer to a review file, with optional real PR number."""
+    """Human-readable pointer to a review file, with optional real PR number.
+
+    Preferred helper for inbox Issue bodies (see README PA 投喂协议). When
+    ``pr_number`` is missing, omits the PR phrase entirely — never ``PR #None``.
+    """
     rid = (review_id or "").strip() or "security-reviews/"
     ref = format_pr_ref(pr_number)
     if ref:
@@ -563,13 +569,13 @@ def format_security_review_cite(
 
 
 def strip_pr_none_mentions(text: str) -> str:
-    """Remove literal ``PR #None``-style placeholders from feeder/comment text."""
+    """Remove literal ``PR #None``-style placeholders from feeder/comment/pool text."""
     if not text:
         return text
     cleaned = PR_NONE_MENTION_RE.sub("", text)
-    # Collapse leftover double spaces from "见  （" / "见 。" patterns.
-    cleaned = re.sub(r"见\s*（", "（", cleaned)
+    # Only tidy spaces left by the removal (do not rewrite unrelated 「见（」).
     cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r" +\n", "\n", cleaned)
     return cleaned.strip()
 
 
@@ -931,6 +937,9 @@ def add_candidate(
     track = (track or "web").lower()
     if track not in VALID_TRACKS:
         track = "web"
+    # Never persist feeder placeholders like "PR #None" into pool rows.
+    if entry.get("search_hint"):
+        entry["search_hint"] = strip_pr_none_mentions(str(entry["search_hint"]))
     sites = list_pool(track)
     eid = entry.get("id")
     if eid and any(s.get("id") == eid for s in sites):
@@ -985,7 +994,7 @@ def _draft_entry(
         "status": "candidate",
         "kind": kind,
         "covers": covers,
-        "search_hint": search_hint,
+        "search_hint": strip_pr_none_mentions(search_hint or ""),
         "auth": auth,
         "added_at": date.today().isoformat(),
     }
@@ -1087,6 +1096,10 @@ def triage_skill_locator(
 
     covers = list(explicit.get("covers") or ["design-skill"])
     skill_id = slug_id(locator, resolved_name)
+    # Issue body may contain feeder typos like "PR #None"; never persist those.
+    search_hint = strip_pr_none_mentions(
+        reason.strip() or "track: skill design playbook locator"
+    )
     entry: dict[str, Any] = {
         "id": skill_id,
         "name": resolved_name or domain_of(locator) or skill_id,
@@ -1096,7 +1109,7 @@ def triage_skill_locator(
         "url": locator,
         "aliases": [],
         "covers": covers,
-        "search_hint": reason.strip() or "track: skill design playbook locator",
+        "search_hint": search_hint,
         "auth": "none",
         "actual_test_status": "not_tested",
         "added_at": date.today().isoformat(),
@@ -1377,12 +1390,14 @@ INBOX_DEDUP_TERMINAL_MARKERS: tuple[str, ...] = (
     "🚫 当前冻结普通 landing",
     "🚫 **rejected_security_blocked**",
     "🚫 非白名单作者",
+    "🚫 未找到 URL",
 )
 # Non-terminal = retryable after maintainer fixes review / kind / etc.
 INBOX_DEDUP_RETRYABLE_MARKERS: tuple[str, ...] = (
     "🛡️ **pending_security_review**",
     "👀 **needs_human**",
     "⚠️ **非法 kind**",
+    "📋 **triage_other**",
 )
 INBOX_DEDUP_ANY_MARKERS: tuple[str, ...] = (
     INBOX_DEDUP_TERMINAL_MARKERS + INBOX_DEDUP_RETRYABLE_MARKERS
@@ -1456,18 +1471,22 @@ def build_inbox_comment(result: dict[str, Any]) -> str:
             "不会按 covers/规则静默回退，也不会写入池或墓碑。"
             "请改正文 `kind:` 后重开或重贴。"
         )
+    elif decision == "rejected_no_url":
+        comment = "🚫 未找到 URL。请把完整 URL 放在标题或正文。"
     elif decision == "needs_human":
         write_err = result.get("write_error")
         extra = f"\n- write_error: {write_err}" if write_err else ""
         comment = (
             "👀 **needs_human**：初筛无法自动确认（弱 HTML / SPA / 缺 covers"
             f"{' / 席位满' if write_err else ''}）。"
-            f"轨：`{track}`。不会写入墓碑。请维护者人工看一眼。{extra}\n"
+            f"轨：`{track}`。不会写入墓碑。请维护者人工看一眼。"
+            "若要在补审查/改正文后重试：先关闭再重开本 Issue。"
+            f"{extra}\n"
             f"```json\n{json.dumps(result.get('draft') or result, ensure_ascii=False, indent=2)}\n```"
         )
     else:
         comment = (
-            f"结论：`{decision}`\n"
+            f"📋 **triage_other**：结论：`{decision}`\n"
             f"```json\n{json.dumps(result, ensure_ascii=False, indent=2)}\n```"
         )
     return strip_pr_none_mentions(comment)
@@ -1484,11 +1503,10 @@ def cmd_inbox_from_env() -> int:
             url = m.group(0).rstrip(").,]")
         else:
             print("::error::No URL in issue title/body")
-            out = {
-                "decision": "rejected",
-                "comment": "未在标题或正文中找到 URL。请把完整 URL 放在标题。",
-            }
-            print(json.dumps(out, ensure_ascii=False))
+            out = {"decision": "rejected_no_url", "track": "web"}
+            comment = build_inbox_comment(out)
+            out["comment"] = comment
+            print(comment)
             Path("/tmp/triage-result.json").write_text(
                 json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8"
             )
