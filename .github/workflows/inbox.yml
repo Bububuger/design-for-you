@@ -3,7 +3,10 @@ name: inbox-triage
 
 on:
   issues:
-    types: [opened, labeled, reopened]
+    # Do NOT listen to `opened`: creating an issue with the inbox label fires both
+    # `opened` and `labeled`, which previously ran triage twice and double-commented.
+    # `labeled` (inbox) covers create-with-label and add-label-later; `reopened` for retry.
+    types: [labeled, reopened]
 
 permissions:
   contents: write
@@ -18,7 +21,10 @@ jobs:
   triage:
     if: >
       contains(join(github.event.issue.labels.*.name, ','), 'inbox')
-      || (github.event.action == 'opened' && contains(github.event.issue.title, 'http'))
+      && (
+        github.event.action != 'labeled'
+        || github.event.label.name == 'inbox'
+      )
     runs-on: ubuntu-latest
     steps:
       - name: Check allowlist
@@ -76,27 +82,35 @@ jobs:
         if: steps.allow.outputs.allowed == '1'
         run: pip install -r requirements.txt
 
-      - name: Ensure inbox label
+      - name: Skip if already triaged (idempotent)
         if: steps.allow.outputs.allowed == '1'
+        id: dedup
         uses: actions/github-script@v7
         with:
           script: |
-            const labels = (context.payload.issue.labels || []).map(l => l.name);
-            if (!labels.includes('inbox')) {
-              try {
-                await github.rest.issues.addLabels({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: context.payload.issue.number,
-                  labels: ['inbox']
-                });
-              } catch (e) {
-                core.warning('Could not add inbox label: ' + e.message);
-              }
+            // Prevent concurrent duplicate pushes/comments if two events still race.
+            const markers = ['✅ 已入', '⏭️ 重复', '🚫', '🛡️ **pending_security_review**', '👀 **needs_human**', '⚠️ **非法 kind**'];
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              per_page: 100,
+            });
+            const bot = comments.find(c => {
+              const login = (c.user && c.user.login) || '';
+              if (login !== 'github-actions[bot]' && login !== 'design-for-you-bot') return false;
+              const body = c.body || '';
+              return markers.some(m => body.includes(m));
+            });
+            if (bot) {
+              core.info('Skip: triage conclusion comment already present');
+              core.setOutput('skip', '1');
+            } else {
+              core.setOutput('skip', '0');
             }
 
       - name: Run triage
-        if: steps.allow.outputs.allowed == '1'
+        if: steps.allow.outputs.allowed == '1' && steps.dedup.outputs.skip != '1'
         id: triage
         env:
           ISSUE_TITLE: ${{ github.event.issue.title }}
@@ -109,7 +123,7 @@ jobs:
           test -f /tmp/triage-result.json
 
       - name: Commit pool changes
-        if: steps.allow.outputs.allowed == '1'
+        if: steps.allow.outputs.allowed == '1' && steps.dedup.outputs.skip != '1'
         run: |
           set -euo pipefail
           git config user.name "design-for-you-bot"
@@ -141,7 +155,7 @@ jobs:
           fi
 
       - name: Comment and close
-        if: steps.allow.outputs.allowed == '1'
+        if: steps.allow.outputs.allowed == '1' && steps.dedup.outputs.skip != '1'
         uses: actions/github-script@v7
         with:
           script: |
@@ -155,6 +169,8 @@ jobs:
                 body = fs.readFileSync('/tmp/triage-comment.txt', 'utf8');
               } catch (_) {}
             }
+            // Never leave feeder placeholders like "PR #None" in the bot comment.
+            body = String(body).replace(/\bPR\s*#\s*(?:None|null|nil)\b/gi, '').replace(/[ \t]{2,}/g, ' ').trim();
             const issue = context.payload.issue.number;
             await github.rest.issues.createComment({
               owner: context.repo.owner,

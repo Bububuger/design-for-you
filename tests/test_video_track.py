@@ -98,6 +98,8 @@ class TestExplicitTrackVideo(unittest.TestCase):
         )
         self.assertEqual(labels.get("track"), "video")
         self.assertNotIn("kind", labels)
+        # Explicit illegal kind must surface (not silent drop) for fail-closed inbox.
+        self.assertEqual(labels.get("invalid_kind"), "component")
 
     def test_default_track_is_web(self) -> None:
         labels = parse_explicit_labels("kind: component\ncovers: table\n")

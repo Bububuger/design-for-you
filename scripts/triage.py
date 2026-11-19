@@ -455,6 +455,12 @@ EXPLICIT_LICENSE_NOTE_RE = re.compile(
     r"(?:^|\n)\s*license_note\s*[:=]\s*(.+)$",
     re.I | re.M,
 )
+EXPLICIT_NAME_RE = re.compile(
+    r"(?:^|\n)\s*name\s*[:=]\s*([^\n#]+)",
+    re.I,
+)
+# Literal "PR #None" / "PR #null" from feeders that stringified a missing number.
+PR_NONE_MENTION_RE = re.compile(r"\bPR\s*#\s*(?:None|null|nil)\b", re.I)
 
 VIDEO_KIND_HINTS = {
     "launch-demo": ["launch-demo", "launch demo", "product launch", "发布视频", "演示视频", "demo reel"],
@@ -478,7 +484,12 @@ def kinds_for_track(track: str) -> frozenset[str]:
 
 
 def parse_explicit_labels(reason: str, track: str | None = None) -> dict[str, Any]:
-    """Honor explicit track/kind/covers/license_note in the issue body when present."""
+    """Honor explicit track/kind/covers/name/license_note in the issue body when present.
+
+    An explicit `kind:` that is not valid for the resolved track is recorded as
+    `invalid_kind` (never silently dropped) so callers can fail closed with a
+    clear needs_human message instead of falling back to covers/rules.
+    """
     out: dict[str, Any] = {}
     if not reason:
         return out
@@ -494,6 +505,13 @@ def parse_explicit_labels(reason: str, track: str | None = None) -> dict[str, An
         kind = km.group(1).lower()
         if kind in allowed:
             out["kind"] = kind
+        else:
+            out["invalid_kind"] = kind
+    nm = EXPLICIT_NAME_RE.search(reason)
+    if nm:
+        name = nm.group(1).strip().strip("'\"")
+        if name:
+            out["name"] = name
     cm = EXPLICIT_COVERS_RE.search(reason)
     if cm:
         raw = cm.group(1).strip().strip("[]")
@@ -510,6 +528,49 @@ def parse_explicit_labels(reason: str, track: str | None = None) -> dict[str, An
         if note:
             out["license_note"] = note
     return out
+
+
+def format_pr_ref(pr_number: int | str | None) -> str:
+    """Return ``PR #N`` for a real positive PR number; otherwise ``\"\"``.
+
+    Feeders that do ``f\"PR #{pr}\"`` with ``pr is None`` produce the literal
+    ``PR #None`` — never emit that. Callers should omit the phrase entirely
+    when this returns empty.
+    """
+    if pr_number is None:
+        return ""
+    raw = str(pr_number).strip()
+    if not raw or raw.lower() in {"none", "null", "nil"}:
+        return ""
+    try:
+        n = int(raw)
+    except ValueError:
+        return ""
+    if n <= 0:
+        return ""
+    return f"PR #{n}"
+
+
+def format_security_review_cite(
+    review_id: str, pr_number: int | str | None = None
+) -> str:
+    """Human-readable pointer to a review file, with optional real PR number."""
+    rid = (review_id or "").strip() or "security-reviews/"
+    ref = format_pr_ref(pr_number)
+    if ref:
+        return f"配套 security review 见 {ref}（{rid}）。"
+    return f"配套 security review：{rid}。"
+
+
+def strip_pr_none_mentions(text: str) -> str:
+    """Remove literal ``PR #None``-style placeholders from feeder/comment text."""
+    if not text:
+        return text
+    cleaned = PR_NONE_MENTION_RE.sub("", text)
+    # Collapse leftover double spaces from "见  （" / "见 。" patterns.
+    cleaned = re.sub(r"见\s*（", "（", cleaned)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    return cleaned.strip()
 
 
 def rule_video_kind_from_text(text: str, reason: str = "") -> str:
@@ -629,8 +690,27 @@ def llm_covers_and_hint(
 
 
 def slug_id(url: str, name: str | None = None) -> str:
+    """Stable resource id for triage / security admission AND matching.
+
+    Priority:
+    1. Explicit ``name`` (CLI ``--name`` or issue ``name:``) — same as review
+       ``resource_id`` convention when feeders pass the short id.
+    2. GitHub ``owner/repo`` URLs → **repo slug** (not the host label
+       ``github``, which collapsed every GitHub skill to one id).
+    3. Otherwise the registrable host's first label (``uizze.sh`` → ``uizze``).
+
+    Different GitHub repos with different repo names must not share an id.
+    Admission still requires track + id + locator (fail closed); locator keeps
+    owner/repo identity even if two unrelated repos share a short name.
+    """
     if name:
         s = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+        if s:
+            return s[:48]
+    gh = github_repo_key(url)
+    if gh:
+        repo = gh.split("/", 1)[1]
+        s = re.sub(r"[^a-z0-9]+", "-", repo.lower()).strip("-")
         if s:
             return s[:48]
     host = domain_of(url).split(".")[0]
@@ -991,18 +1071,25 @@ def triage_skill_locator(
     }
     locator = secu.normalize_locator(url)
     result["url"] = locator
+    explicit = parse_explicit_labels(reason, track="skill")
+    if explicit.get("invalid_kind"):
+        result["decision"] = "needs_human"
+        result["note"] = f"invalid_kind:{explicit['invalid_kind']}"
+        result["invalid_kind"] = explicit["invalid_kind"]
+        result["allowed_kinds"] = sorted(SKILL_KINDS)
+        return result
+    resolved_name = name or explicit.get("name")
     dup = find_duplicate(locator, track="skill")
     if dup:
         result["decision"] = "duplicate"
         result["duplicate"] = dup
         return result
 
-    explicit = parse_explicit_labels(reason, track="skill")
     covers = list(explicit.get("covers") or ["design-skill"])
-    skill_id = slug_id(locator, name)
+    skill_id = slug_id(locator, resolved_name)
     entry: dict[str, Any] = {
         "id": skill_id,
-        "name": name or domain_of(locator) or skill_id,
+        "name": resolved_name or domain_of(locator) or skill_id,
         "status": "candidate",
         "kind": explicit.get("kind") or "design-skill",
         "source": {"install_locator": locator},
@@ -1073,15 +1160,30 @@ def triage_url(
     result["url"] = normalized
 
     # Resolve track early (explicit CLI/arg wins; else issue body; default web).
-    explicit_early = parse_explicit_labels(reason)
-    resolved_track = (track or explicit_early.get("track") or "web").lower()
+    # First pass only needs track/name; kind validity depends on resolved track.
+    track_pass = parse_explicit_labels(reason)
+    resolved_track = (track or track_pass.get("track") or "web").lower()
     if resolved_track not in VALID_TRACKS:
         resolved_track = "web"
     result["track"] = resolved_track
     allowed_kinds = kinds_for_track(resolved_track)
+    explicit_early = parse_explicit_labels(reason, track=resolved_track)
+    # Prefer CLI --name; else issue-body name: (inbox does not pass --name).
+    resolved_name = name or explicit_early.get("name")
+
+    if explicit_early.get("invalid_kind"):
+        # Fail closed: never silently ignore an explicit illegal kind and
+        # continue with covers/rules (that mis-filed #40 as landing).
+        result["decision"] = "needs_human"
+        result["note"] = f"invalid_kind:{explicit_early['invalid_kind']}"
+        result["invalid_kind"] = explicit_early["invalid_kind"]
+        result["allowed_kinds"] = sorted(allowed_kinds)
+        return result
 
     if resolved_track == "skill":
-        return triage_skill_locator(url, reason=reason, name=name, write=write)
+        return triage_skill_locator(
+            url, reason=reason, name=resolved_name, write=write
+        )
 
     dup = find_duplicate(normalized, track=resolved_track)
     if dup:
@@ -1174,7 +1276,13 @@ def triage_url(
         result["note"] = "weak_covers_no_llm"
         # still attach draft for human
         result["draft"] = _draft_entry(
-            result["url"], name, kind, covers, search_hint, auth, license_note
+            result["url"],
+            resolved_name,
+            kind,
+            covers,
+            search_hint,
+            auth,
+            license_note,
         )
         return result
 
@@ -1194,12 +1302,24 @@ def triage_url(
         # Keep human path unless LLM + strong score
         result["decision"] = "needs_human"
         result["draft"] = _draft_entry(
-            result["url"], name, kind, covers, search_hint, auth, license_note
+            result["url"],
+            resolved_name,
+            kind,
+            covers,
+            search_hint,
+            auth,
+            license_note,
         )
         return result
 
     entry = _draft_entry(
-        result["url"], name, kind, covers, search_hint, auth, license_note
+        result["url"],
+        resolved_name,
+        kind,
+        covers,
+        search_hint,
+        auth,
+        license_note,
     )
     # Web integrity pin: prefer hash of actually fetched HTML (snapshot evidence).
     # Issue-supplied content_sha256 is advisory and must match fetched bytes if both
@@ -1249,28 +1369,8 @@ def triage_url(
     return result
 
 
-def cmd_inbox_from_env() -> int:
-    """GitHub Actions helper: read issue title/body, triage, print JSON + markdown comment."""
-    url = os.environ.get("ISSUE_TITLE", "").strip()
-    body = os.environ.get("ISSUE_BODY", "") or ""
-    if not url or not url.startswith("http") and "://" not in url and "." not in url:
-        # sometimes URL is only in body
-        m = re.search(r"https?://\S+", body)
-        if m:
-            url = m.group(0).rstrip(").,]")
-        else:
-            print("::error::No URL in issue title/body")
-            out = {
-                "decision": "rejected",
-                "comment": "未在标题或正文中找到 URL。请把完整 URL 放在标题。",
-            }
-            print(json.dumps(out, ensure_ascii=False))
-            Path("/tmp/triage-result.json").write_text(
-                json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8"
-            )
-            return 0
-
-    result = triage_url(url, reason=body, write=True)
+def build_inbox_comment(result: dict[str, Any]) -> str:
+    """Markdown comment posted by Actions after triage (observable bot output)."""
     decision = result.get("decision")
     track = result.get("track") or "web"
     if decision == "accept_candidate":
@@ -1295,6 +1395,7 @@ def cmd_inbox_from_env() -> int:
             "或 review 已过期/不足。Issue 正文自称 approved **无效**。"
             f"轨：`{track}`。未写入 candidate/core。\n"
             f"- admission: `{adm.get('status')}` — {adm.get('reason')}\n"
+            f"- resource_id: `{(result.get('draft') or result.get('entry') or {}).get('id')}`\n"
             f"- ignored_issue_claims: {adm.get('ignored_issue_claims') or []}\n"
             "请维护者在 `security-reviews/` 提交 review 后再投喂。"
         )
@@ -1304,6 +1405,16 @@ def cmd_inbox_from_env() -> int:
             "🚫 **rejected_security_blocked**：存在 conclusion=block 的 security review。"
             f"轨：`{track}`。不可自动入 candidate/core。\n"
             f"- review: `{adm.get('review_id')}` — {adm.get('reason')}"
+        )
+    elif decision == "needs_human" and result.get("invalid_kind"):
+        allowed = ", ".join(
+            result.get("allowed_kinds") or sorted(kinds_for_track(track))
+        )
+        comment = (
+            f"⚠️ **非法 kind**：`{result.get('invalid_kind')}` 不是轨 `{track}` "
+            f"的合法类型（允许：{allowed}）。"
+            "不会按 covers/规则静默回退，也不会写入池或墓碑。"
+            "请改正文 `kind:` 后重开或重贴。"
         )
     elif decision == "needs_human":
         write_err = result.get("write_error")
@@ -1315,8 +1426,37 @@ def cmd_inbox_from_env() -> int:
             f"```json\n{json.dumps(result.get('draft') or result, ensure_ascii=False, indent=2)}\n```"
         )
     else:
-        comment = f"结论：`{decision}`\n```json\n{json.dumps(result, ensure_ascii=False, indent=2)}\n```"
+        comment = (
+            f"结论：`{decision}`\n"
+            f"```json\n{json.dumps(result, ensure_ascii=False, indent=2)}\n```"
+        )
+    return strip_pr_none_mentions(comment)
 
+
+def cmd_inbox_from_env() -> int:
+    """GitHub Actions helper: read issue title/body, triage, print JSON + markdown comment."""
+    url = os.environ.get("ISSUE_TITLE", "").strip()
+    body = os.environ.get("ISSUE_BODY", "") or ""
+    if not url or not url.startswith("http") and "://" not in url and "." not in url:
+        # sometimes URL is only in body
+        m = re.search(r"https?://\S+", body)
+        if m:
+            url = m.group(0).rstrip(").,]")
+        else:
+            print("::error::No URL in issue title/body")
+            out = {
+                "decision": "rejected",
+                "comment": "未在标题或正文中找到 URL。请把完整 URL 放在标题。",
+            }
+            print(json.dumps(out, ensure_ascii=False))
+            Path("/tmp/triage-result.json").write_text(
+                json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            return 0
+
+    labels = parse_explicit_labels(body)
+    result = triage_url(url, reason=body, name=labels.get("name"), write=True)
+    comment = build_inbox_comment(result)
     result["comment"] = comment
     Path("/tmp/triage-result.json").write_text(
         json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
