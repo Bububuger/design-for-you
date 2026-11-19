@@ -1,8 +1,12 @@
-# Issue 收件箱：白名单作者开 [inbox] Issue → triage → candidate / graveyard / needs_human
+# Issue 收件箱：白名单作者开 Issue → triage → candidate / graveyard / needs_human
 name: inbox-triage
 
 on:
   issues:
+    # Event partition (avoids opened+labeled double-run on create-with-inbox):
+    # - labeled(inbox): create-with-label OR add-label-later
+    # - opened + title has http + NO inbox yet: third-party / no-label feed path
+    # - reopened: retry after pending_security_review / needs_human / illegal kind
     types: [opened, labeled, reopened]
 
 permissions:
@@ -17,8 +21,22 @@ concurrency:
 jobs:
   triage:
     if: >
-      contains(join(github.event.issue.labels.*.name, ','), 'inbox')
-      || (github.event.action == 'opened' && contains(github.event.issue.title, 'http'))
+      (
+        github.event.action == 'labeled'
+        && github.event.label.name == 'inbox'
+      )
+      || (
+        github.event.action == 'opened'
+        && contains(github.event.issue.title, 'http')
+        && !contains(join(github.event.issue.labels.*.name, ','), 'inbox')
+      )
+      || (
+        github.event.action == 'reopened'
+        && (
+          contains(join(github.event.issue.labels.*.name, ','), 'inbox')
+          || contains(github.event.issue.title, 'http')
+        )
+      )
     runs-on: ubuntu-latest
     steps:
       - name: Check allowlist
@@ -76,27 +94,45 @@ jobs:
         if: steps.allow.outputs.allowed == '1'
         run: pip install -r requirements.txt
 
-      - name: Ensure inbox label
+      - name: Collect prior bot comments
         if: steps.allow.outputs.allowed == '1'
+        id: collect
         uses: actions/github-script@v7
         with:
           script: |
-            const labels = (context.payload.issue.labels || []).map(l => l.name);
-            if (!labels.includes('inbox')) {
-              try {
-                await github.rest.issues.addLabels({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: context.payload.issue.number,
-                  labels: ['inbox']
-                });
-              } catch (e) {
-                core.warning('Could not add inbox label: ' + e.message);
-              }
-            }
+            const fs = require('fs');
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              per_page: 100,
+            });
+            const bodies = comments
+              .filter(c => {
+                const login = (c.user && c.user.login) || '';
+                return login === 'github-actions[bot]' || login === 'design-for-you-bot';
+              })
+              .map(c => c.body || '');
+            fs.writeFileSync(
+              '/tmp/inbox-bot-comments.json',
+              JSON.stringify({ bodies })
+            );
+            core.info(`Collected ${bodies.length} prior bot comment(s)`);
+
+      - name: Skip if already triaged (idempotent)
+        if: steps.allow.outputs.allowed == '1'
+        id: dedup
+        env:
+          EVENT_ACTION: ${{ github.event.action }}
+        run: |
+          set -euo pipefail
+          # Single source of truth: scripts/triage.py inbox_dedup_should_skip
+          skip="$(python scripts/triage.py inbox-dedup --action "${EVENT_ACTION}" < /tmp/inbox-bot-comments.json | tail -n1)"
+          echo "skip=${skip}" >> "$GITHUB_OUTPUT"
+          echo "Dedup action=${EVENT_ACTION} skip=${skip}"
 
       - name: Run triage
-        if: steps.allow.outputs.allowed == '1'
+        if: steps.allow.outputs.allowed == '1' && steps.dedup.outputs.skip != '1'
         id: triage
         env:
           ISSUE_TITLE: ${{ github.event.issue.title }}
@@ -109,7 +145,7 @@ jobs:
           test -f /tmp/triage-result.json
 
       - name: Commit pool changes
-        if: steps.allow.outputs.allowed == '1'
+        if: steps.allow.outputs.allowed == '1' && steps.dedup.outputs.skip != '1'
         run: |
           set -euo pipefail
           git config user.name "design-for-you-bot"
@@ -141,7 +177,7 @@ jobs:
           fi
 
       - name: Comment and close
-        if: steps.allow.outputs.allowed == '1'
+        if: steps.allow.outputs.allowed == '1' && steps.dedup.outputs.skip != '1'
         uses: actions/github-script@v7
         with:
           script: |
@@ -155,6 +191,8 @@ jobs:
                 body = fs.readFileSync('/tmp/triage-comment.txt', 'utf8');
               } catch (_) {}
             }
+            // Never leave feeder placeholders like "PR #None" in the bot comment.
+            body = String(body).replace(/\bPR\s*#\s*(?:None|null|nil)\b/gi, '').replace(/[ \t]{2,}/g, ' ').trim();
             const issue = context.payload.issue.number;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
@@ -175,4 +213,24 @@ jobs:
                 state: 'closed',
                 state_reason: 'completed'
               });
+            }
+
+      # AFTER comment so the follow-up `labeled` event sees prior bot output and dedups.
+      - name: Ensure inbox label
+        if: steps.allow.outputs.allowed == '1' && steps.dedup.outputs.skip != '1'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = (context.payload.issue.labels || []).map(l => l.name);
+            if (!labels.includes('inbox')) {
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.payload.issue.number,
+                  labels: ['inbox']
+                });
+              } catch (e) {
+                core.warning('Could not add inbox label: ' + e.message);
+              }
             }

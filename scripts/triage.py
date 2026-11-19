@@ -439,22 +439,32 @@ LANDING_POSITIVE_KEYS = (
     "落地页",
 )
 
+# After the field separator, only horizontal whitespace — never `\s*` (which
+# would eat the newline and steal the next line: empty `kind:` →
+# invalid_kind=covers, empty `covers:` → covers=['<!--']).
 EXPLICIT_KIND_RE = re.compile(
-    r"(?:^|\n)\s*kind\s*[:=]\s*([a-z0-9-]+)\b",
+    # Underscores allowed (product_flow); normalized to hyphens before allow-list check.
+    r"(?:^|\n)[ \t]*kind[ \t]*[:=][ \t]*([a-z0-9_-]+)\b",
     re.I,
 )
 EXPLICIT_TRACK_RE = re.compile(
-    r"(?:^|\n)\s*track\s*[:=]\s*(web|video|skill)\b",
+    r"(?:^|\n)[ \t]*track[ \t]*[:=][ \t]*(web|video|skill)\b",
     re.I,
 )
 EXPLICIT_COVERS_RE = re.compile(
-    r"(?:^|\n)\s*covers\s*[:=]\s*\[?([^\n\]]+)\]?",
+    r"(?:^|\n)[ \t]*covers[ \t]*[:=][ \t]*\[?([^\n\]]+)\]?",
     re.I,
 )
 EXPLICIT_LICENSE_NOTE_RE = re.compile(
-    r"(?:^|\n)\s*license_note\s*[:=]\s*(.+)$",
+    r"(?:^|\n)[ \t]*license_note[ \t]*[:=][ \t]*(.+)$",
     re.I | re.M,
 )
+EXPLICIT_NAME_RE = re.compile(
+    r"(?:^|\n)[ \t]*name[ \t]*[:=][ \t]*([^\n#]+)",
+    re.I,
+)
+# Literal "PR #None" / "PR #null" from feeders that stringified a missing number.
+PR_NONE_MENTION_RE = re.compile(r"\bPR\s*#\s*(?:None|null|nil)\b", re.I)
 
 VIDEO_KIND_HINTS = {
     "launch-demo": ["launch-demo", "launch demo", "product launch", "发布视频", "演示视频", "demo reel"],
@@ -478,7 +488,12 @@ def kinds_for_track(track: str) -> frozenset[str]:
 
 
 def parse_explicit_labels(reason: str, track: str | None = None) -> dict[str, Any]:
-    """Honor explicit track/kind/covers/license_note in the issue body when present."""
+    """Honor explicit track/kind/covers/name/license_note in the issue body when present.
+
+    An explicit `kind:` that is not valid for the resolved track is recorded as
+    `invalid_kind` (never silently dropped) so callers can fail closed with a
+    clear needs_human message instead of falling back to covers/rules.
+    """
     out: dict[str, Any] = {}
     if not reason:
         return out
@@ -491,9 +506,17 @@ def parse_explicit_labels(reason: str, track: str | None = None) -> dict[str, An
     allowed = kinds_for_track(resolved_track)
     km = EXPLICIT_KIND_RE.search(reason)
     if km:
-        kind = km.group(1).lower()
+        # Normalize product_flow → product-flow so underscore forms are not dropped.
+        kind = km.group(1).lower().replace("_", "-")
         if kind in allowed:
             out["kind"] = kind
+        else:
+            out["invalid_kind"] = kind
+    nm = EXPLICIT_NAME_RE.search(reason)
+    if nm:
+        name = nm.group(1).strip().strip("'\"")
+        if name:
+            out["name"] = name
     cm = EXPLICIT_COVERS_RE.search(reason)
     if cm:
         raw = cm.group(1).strip().strip("[]")
@@ -510,6 +533,53 @@ def parse_explicit_labels(reason: str, track: str | None = None) -> dict[str, An
         if note:
             out["license_note"] = note
     return out
+
+
+def format_pr_ref(pr_number: int | str | None) -> str:
+    """Return ``PR #N`` for a real positive PR number; otherwise ``\"\"``.
+
+    Feeders that do ``f\"PR #{pr}\"`` with ``pr is None`` produce the literal
+    ``PR #None`` — never emit that. Callers should omit the phrase entirely
+    when this returns empty. Used by ``format_security_review_cite`` (PA 投喂).
+    """
+    if pr_number is None:
+        return ""
+    raw = str(pr_number).strip()
+    if not raw or raw.lower() in {"none", "null", "nil"}:
+        return ""
+    try:
+        n = int(raw)
+    except ValueError:
+        return ""
+    if n <= 0:
+        return ""
+    return f"PR #{n}"
+
+
+def format_security_review_cite(
+    review_id: str, pr_number: int | str | None = None
+) -> str:
+    """Human-readable pointer to a review file, with optional real PR number.
+
+    Preferred helper for inbox Issue bodies (see README PA 投喂协议). When
+    ``pr_number`` is missing, omits the PR phrase entirely — never ``PR #None``.
+    """
+    rid = (review_id or "").strip() or "security-reviews/"
+    ref = format_pr_ref(pr_number)
+    if ref:
+        return f"配套 security review 见 {ref}（{rid}）。"
+    return f"配套 security review：{rid}。"
+
+
+def strip_pr_none_mentions(text: str) -> str:
+    """Remove literal ``PR #None``-style placeholders from feeder/comment/pool text."""
+    if not text:
+        return text
+    cleaned = PR_NONE_MENTION_RE.sub("", text)
+    # Only tidy spaces left by the removal (do not rewrite unrelated 「见（」).
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r" +\n", "\n", cleaned)
+    return cleaned.strip()
 
 
 def rule_video_kind_from_text(text: str, reason: str = "") -> str:
@@ -629,8 +699,27 @@ def llm_covers_and_hint(
 
 
 def slug_id(url: str, name: str | None = None) -> str:
+    """Stable resource id for triage / security admission AND matching.
+
+    Priority:
+    1. Explicit ``name`` (CLI ``--name`` or issue ``name:``) — same as review
+       ``resource_id`` convention when feeders pass the short id.
+    2. GitHub ``owner/repo`` URLs → **repo slug** (not the host label
+       ``github``, which collapsed every GitHub skill to one id).
+    3. Otherwise the registrable host's first label (``uizze.sh`` → ``uizze``).
+
+    Different GitHub repos with different repo names must not share an id.
+    Admission still requires track + id + locator (fail closed); locator keeps
+    owner/repo identity even if two unrelated repos share a short name.
+    """
     if name:
         s = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+        if s:
+            return s[:48]
+    gh = github_repo_key(url)
+    if gh:
+        repo = gh.split("/", 1)[1]
+        s = re.sub(r"[^a-z0-9]+", "-", repo.lower()).strip("-")
         if s:
             return s[:48]
     host = domain_of(url).split(".")[0]
@@ -851,6 +940,9 @@ def add_candidate(
     track = (track or "web").lower()
     if track not in VALID_TRACKS:
         track = "web"
+    # Never persist feeder placeholders like "PR #None" into pool rows.
+    if entry.get("search_hint"):
+        entry["search_hint"] = strip_pr_none_mentions(str(entry["search_hint"]))
     sites = list_pool(track)
     eid = entry.get("id")
     if eid and any(s.get("id") == eid for s in sites):
@@ -905,7 +997,7 @@ def _draft_entry(
         "status": "candidate",
         "kind": kind,
         "covers": covers,
-        "search_hint": search_hint,
+        "search_hint": strip_pr_none_mentions(search_hint or ""),
         "auth": auth,
         "added_at": date.today().isoformat(),
     }
@@ -991,25 +1083,36 @@ def triage_skill_locator(
     }
     locator = secu.normalize_locator(url)
     result["url"] = locator
+    explicit = parse_explicit_labels(reason, track="skill")
+    if explicit.get("invalid_kind"):
+        result["decision"] = "needs_human"
+        result["note"] = f"invalid_kind:{explicit['invalid_kind']}"
+        result["invalid_kind"] = explicit["invalid_kind"]
+        result["allowed_kinds"] = sorted(SKILL_KINDS)
+        return result
+    resolved_name = name or explicit.get("name")
     dup = find_duplicate(locator, track="skill")
     if dup:
         result["decision"] = "duplicate"
         result["duplicate"] = dup
         return result
 
-    explicit = parse_explicit_labels(reason, track="skill")
     covers = list(explicit.get("covers") or ["design-skill"])
-    skill_id = slug_id(locator, name)
+    skill_id = slug_id(locator, resolved_name)
+    # Issue body may contain feeder typos like "PR #None"; never persist those.
+    search_hint = strip_pr_none_mentions(
+        reason.strip() or "track: skill design playbook locator"
+    )
     entry: dict[str, Any] = {
         "id": skill_id,
-        "name": name or domain_of(locator) or skill_id,
+        "name": resolved_name or domain_of(locator) or skill_id,
         "status": "candidate",
         "kind": explicit.get("kind") or "design-skill",
         "source": {"install_locator": locator},
         "url": locator,
         "aliases": [],
         "covers": covers,
-        "search_hint": reason.strip() or "track: skill design playbook locator",
+        "search_hint": search_hint,
         "auth": "none",
         "actual_test_status": "not_tested",
         "added_at": date.today().isoformat(),
@@ -1073,15 +1176,30 @@ def triage_url(
     result["url"] = normalized
 
     # Resolve track early (explicit CLI/arg wins; else issue body; default web).
-    explicit_early = parse_explicit_labels(reason)
-    resolved_track = (track or explicit_early.get("track") or "web").lower()
+    # First pass only needs track/name; kind validity depends on resolved track.
+    track_pass = parse_explicit_labels(reason)
+    resolved_track = (track or track_pass.get("track") or "web").lower()
     if resolved_track not in VALID_TRACKS:
         resolved_track = "web"
     result["track"] = resolved_track
     allowed_kinds = kinds_for_track(resolved_track)
+    explicit_early = parse_explicit_labels(reason, track=resolved_track)
+    # Prefer CLI --name; else issue-body name: (inbox does not pass --name).
+    resolved_name = name or explicit_early.get("name")
+
+    if explicit_early.get("invalid_kind"):
+        # Fail closed: never silently ignore an explicit illegal kind and
+        # continue with covers/rules (that mis-filed #40 as landing).
+        result["decision"] = "needs_human"
+        result["note"] = f"invalid_kind:{explicit_early['invalid_kind']}"
+        result["invalid_kind"] = explicit_early["invalid_kind"]
+        result["allowed_kinds"] = sorted(allowed_kinds)
+        return result
 
     if resolved_track == "skill":
-        return triage_skill_locator(url, reason=reason, name=name, write=write)
+        return triage_skill_locator(
+            url, reason=reason, name=resolved_name, write=write
+        )
 
     dup = find_duplicate(normalized, track=resolved_track)
     if dup:
@@ -1174,7 +1292,13 @@ def triage_url(
         result["note"] = "weak_covers_no_llm"
         # still attach draft for human
         result["draft"] = _draft_entry(
-            result["url"], name, kind, covers, search_hint, auth, license_note
+            result["url"],
+            resolved_name,
+            kind,
+            covers,
+            search_hint,
+            auth,
+            license_note,
         )
         return result
 
@@ -1194,12 +1318,24 @@ def triage_url(
         # Keep human path unless LLM + strong score
         result["decision"] = "needs_human"
         result["draft"] = _draft_entry(
-            result["url"], name, kind, covers, search_hint, auth, license_note
+            result["url"],
+            resolved_name,
+            kind,
+            covers,
+            search_hint,
+            auth,
+            license_note,
         )
         return result
 
     entry = _draft_entry(
-        result["url"], name, kind, covers, search_hint, auth, license_note
+        result["url"],
+        resolved_name,
+        kind,
+        covers,
+        search_hint,
+        auth,
+        license_note,
     )
     # Web integrity pin: prefer hash of actually fetched HTML (snapshot evidence).
     # Issue-supplied content_sha256 is advisory and must match fetched bytes if both
@@ -1249,28 +1385,50 @@ def triage_url(
     return result
 
 
-def cmd_inbox_from_env() -> int:
-    """GitHub Actions helper: read issue title/body, triage, print JSON + markdown comment."""
-    url = os.environ.get("ISSUE_TITLE", "").strip()
-    body = os.environ.get("ISSUE_BODY", "") or ""
-    if not url or not url.startswith("http") and "://" not in url and "." not in url:
-        # sometimes URL is only in body
-        m = re.search(r"https?://\S+", body)
-        if m:
-            url = m.group(0).rstrip(").,]")
-        else:
-            print("::error::No URL in issue title/body")
-            out = {
-                "decision": "rejected",
-                "comment": "未在标题或正文中找到 URL。请把完整 URL 放在标题。",
-            }
-            print(json.dumps(out, ensure_ascii=False))
-            Path("/tmp/triage-result.json").write_text(
-                json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8"
-            )
-            return 0
+# Bot comment markers used by inbox.yml dedup (keep in sync with workflow callers).
+# Terminal = settled outcomes; reopened must NOT retry these.
+INBOX_DEDUP_TERMINAL_MARKERS: tuple[str, ...] = (
+    "✅ 已入",
+    "⏭️ 重复",
+    "🚫 当前冻结普通 landing",
+    "🚫 **rejected_security_blocked**",
+    "🚫 非白名单作者",
+    "🚫 未找到 URL",
+)
+# Non-terminal = retryable after maintainer fixes review / kind / etc.
+INBOX_DEDUP_RETRYABLE_MARKERS: tuple[str, ...] = (
+    "🛡️ **pending_security_review**",
+    "👀 **needs_human**",
+    "⚠️ **非法 kind**",
+    "📋 **triage_other**",
+)
+INBOX_DEDUP_ANY_MARKERS: tuple[str, ...] = (
+    INBOX_DEDUP_TERMINAL_MARKERS + INBOX_DEDUP_RETRYABLE_MARKERS
+)
 
-    result = triage_url(url, reason=body, write=True)
+
+def inbox_dedup_should_skip(action: str, bot_comment_bodies: list[str]) -> bool:
+    """Whether inbox Actions should skip triage for this event.
+
+    - ``opened`` / ``labeled``: skip if *any* prior bot triage comment exists
+      (collapses create-with-label dual fire and opened→add-label→labeled races).
+    - ``reopened``: skip only for *terminal* conclusions (accepted / duplicate /
+      landing freeze / security blocked / allowlist reject). Pending security
+      review, needs_human, and illegal-kind comments must allow a real retry.
+    """
+    act = (action or "").strip().lower()
+    bodies = [b or "" for b in (bot_comment_bodies or [])]
+    if act == "reopened":
+        markers = INBOX_DEDUP_TERMINAL_MARKERS
+    else:
+        # opened, labeled, or unknown: treat any prior triage comment as done
+        # for this delivery (prevents double comments / double pushes).
+        markers = INBOX_DEDUP_ANY_MARKERS
+    return any(any(m in body for m in markers) for body in bodies)
+
+
+def build_inbox_comment(result: dict[str, Any]) -> str:
+    """Markdown comment posted by Actions after triage (observable bot output)."""
     decision = result.get("decision")
     track = result.get("track") or "web"
     if decision == "accept_candidate":
@@ -1295,6 +1453,7 @@ def cmd_inbox_from_env() -> int:
             "或 review 已过期/不足。Issue 正文自称 approved **无效**。"
             f"轨：`{track}`。未写入 candidate/core。\n"
             f"- admission: `{adm.get('status')}` — {adm.get('reason')}\n"
+            f"- resource_id: `{(result.get('draft') or result.get('entry') or {}).get('id')}`\n"
             f"- ignored_issue_claims: {adm.get('ignored_issue_claims') or []}\n"
             "请维护者在 `security-reviews/` 提交 review 后再投喂。"
         )
@@ -1305,18 +1464,60 @@ def cmd_inbox_from_env() -> int:
             f"轨：`{track}`。不可自动入 candidate/core。\n"
             f"- review: `{adm.get('review_id')}` — {adm.get('reason')}"
         )
+    elif decision == "needs_human" and result.get("invalid_kind"):
+        allowed = ", ".join(
+            result.get("allowed_kinds") or sorted(kinds_for_track(track))
+        )
+        comment = (
+            f"⚠️ **非法 kind**：`{result.get('invalid_kind')}` 不是轨 `{track}` "
+            f"的合法类型（允许：{allowed}）。"
+            "不会按 covers/规则静默回退，也不会写入池或墓碑。"
+            "请改正文 `kind:` 后重开或重贴。"
+        )
+    elif decision == "rejected_no_url":
+        comment = "🚫 未找到 URL。请把完整 URL 放在标题或正文。"
     elif decision == "needs_human":
         write_err = result.get("write_error")
         extra = f"\n- write_error: {write_err}" if write_err else ""
         comment = (
             "👀 **needs_human**：初筛无法自动确认（弱 HTML / SPA / 缺 covers"
             f"{' / 席位满' if write_err else ''}）。"
-            f"轨：`{track}`。不会写入墓碑。请维护者人工看一眼。{extra}\n"
+            f"轨：`{track}`。不会写入墓碑。请维护者人工看一眼。"
+            "若要在补审查/改正文后重试：先关闭再重开本 Issue。"
+            f"{extra}\n"
             f"```json\n{json.dumps(result.get('draft') or result, ensure_ascii=False, indent=2)}\n```"
         )
     else:
-        comment = f"结论：`{decision}`\n```json\n{json.dumps(result, ensure_ascii=False, indent=2)}\n```"
+        comment = (
+            f"📋 **triage_other**：结论：`{decision}`\n"
+            f"```json\n{json.dumps(result, ensure_ascii=False, indent=2)}\n```"
+        )
+    return strip_pr_none_mentions(comment)
 
+
+def cmd_inbox_from_env() -> int:
+    """GitHub Actions helper: read issue title/body, triage, print JSON + markdown comment."""
+    url = os.environ.get("ISSUE_TITLE", "").strip()
+    body = os.environ.get("ISSUE_BODY", "") or ""
+    if not url or not url.startswith("http") and "://" not in url and "." not in url:
+        # sometimes URL is only in body
+        m = re.search(r"https?://\S+", body)
+        if m:
+            url = m.group(0).rstrip(").,]")
+        else:
+            print("::error::No URL in issue title/body")
+            out = {"decision": "rejected_no_url", "track": "web"}
+            comment = build_inbox_comment(out)
+            out["comment"] = comment
+            print(comment)
+            Path("/tmp/triage-result.json").write_text(
+                json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            return 0
+
+    labels = parse_explicit_labels(body)
+    result = triage_url(url, reason=body, name=labels.get("name"), write=True)
+    comment = build_inbox_comment(result)
     result["comment"] = comment
     Path("/tmp/triage-result.json").write_text(
         json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -1348,6 +1549,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     sub.add_parser("inbox", help="Actions: triage from ISSUE_TITLE/BODY env")
 
+    d = sub.add_parser(
+        "inbox-dedup",
+        help="Actions: decide whether to skip triage (JSON on stdin → skip 0|1)",
+    )
+    d.add_argument(
+        "--action",
+        required=True,
+        help="GitHub issues event action: opened|labeled|reopened",
+    )
+
     c = sub.add_parser("counts", help="Print seat counts JSON")
     c.add_argument(
         "--track",
@@ -1374,6 +1585,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.cmd == "inbox":
         return cmd_inbox_from_env()
+    if args.cmd == "inbox-dedup":
+        payload = json.loads(sys.stdin.read() or "{}")
+        bodies = payload.get("bodies") or []
+        if not isinstance(bodies, list):
+            bodies = []
+        skip = inbox_dedup_should_skip(args.action, [str(b) for b in bodies])
+        # Observable line for Actions + tests.
+        print("1" if skip else "0")
+        return 0
     if args.cmd == "triage":
         out = triage_url(
             args.url,

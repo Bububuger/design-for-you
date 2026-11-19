@@ -1,0 +1,747 @@
+#!/usr/bin/env python3
+"""Regressions for inbox triage defects (#40 / #42 / #43 review findings).
+
+Observable behaviors covered:
+1. GitHub skill locators derive stable repo-slug ids (not host ``github``).
+2. Explicit illegal ``kind:`` fails closed with needs_human (no silent fallback).
+3. Inbox workflow triggers are single-shot (labeled+reopened; not opened+labeled).
+4. PR mention helpers never emit literal ``PR #None``.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+import yaml
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import security_admission as secu  # noqa: E402
+import triage  # noqa: E402
+from triage import (  # noqa: E402
+    INBOX_DEDUP_ANY_MARKERS,
+    INBOX_DEDUP_RETRYABLE_MARKERS,
+    INBOX_DEDUP_TERMINAL_MARKERS,
+    build_inbox_comment,
+    format_pr_ref,
+    format_security_review_cite,
+    inbox_dedup_should_skip,
+    parse_explicit_labels,
+    slug_id,
+    strip_pr_none_mentions,
+    triage_skill_locator,
+    triage_url,
+)
+
+
+SAMPLE_HTML = """
+<html><body>
+  <h1>Gallery</h1>
+  <nav><a href="/a">a</a><a href="/b">b</a><a href="/c">c</a>
+  <a href="/d">d</a><a href="/e">e</a><a href="/f">f</a>
+  <a href="/g">g</a><a href="/h">h</a><a href="/i">i</a>
+  <a href="/j">j</a><a href="/k">k</a><a href="/l">l</a></nav>
+  <p>Browse inspiration gallery screenshots and examples.</p>
+</body></html>
+"""
+
+INBOX_WORKFLOW = ROOT / ".github" / "workflows" / "inbox.yml"
+
+
+class TestGithubSlugIdStable(unittest.TestCase):
+    """Defect 1: github.com host must not collapse every skill to id=github."""
+
+    def test_github_repos_use_repo_slug_not_host(self) -> None:
+        craft = "https://github.com/diego3g/craft"
+        stitch = "https://github.com/google-labs-code/stitch-skills"
+        self.assertEqual(slug_id(craft), "craft")
+        self.assertEqual(slug_id(stitch), "stitch-skills")
+        self.assertNotEqual(slug_id(craft), slug_id(stitch))
+        self.assertNotEqual(slug_id(craft), "github")
+        self.assertNotEqual(slug_id(stitch), "github")
+
+    def test_github_slug_matches_cli_name_convention(self) -> None:
+        url = "https://github.com/diego3g/craft"
+        self.assertEqual(slug_id(url), slug_id(url, "craft"))
+        self.assertEqual(slug_id(url, "craft"), "craft")
+
+    def test_non_github_still_uses_host_label(self) -> None:
+        self.assertEqual(
+            slug_id("https://uizze.sh/.well-known/agent-skills/ui-taste/"),
+            "uizze",
+        )
+        self.assertEqual(slug_id("https://inspora.design/"), "inspora")
+
+    def test_explicit_name_still_wins(self) -> None:
+        self.assertEqual(
+            slug_id("https://github.com/diego3g/craft", "my-craft"),
+            "my-craft",
+        )
+
+    def test_distinct_repo_slugs_yield_distinct_ids(self) -> None:
+        """Different GitHub *repo names* → different slug ids (not host ``github``)."""
+        a = slug_id("https://github.com/assistant-ui/assistant-ui")
+        b = slug_id("https://github.com/tremorlabs/tremor")
+        self.assertEqual(a, "assistant-ui")
+        self.assertEqual(b, "tremor")
+        self.assertNotEqual(a, b)
+
+    def test_same_repo_name_different_owners_share_slug_id(self) -> None:
+        """Repo-slug ids collide across owners; write path must fail closed."""
+        self.assertEqual(
+            slug_id("https://github.com/diego3g/craft"),
+            slug_id("https://github.com/other-org/craft"),
+        )
+        self.assertEqual(slug_id("https://github.com/other-org/craft"), "craft")
+
+    def test_skill_inbox_without_name_matches_review_resource_id(self) -> None:
+        """Inbox path (no --name) must AND-match a review keyed by repo slug.
+
+        Isolated from real skills.yaml / graveyard so pool dupes cannot mask id logic.
+        """
+        locator = "https://github.com/example-owner/craft-fixture/"
+        pin = "a" * 64
+        review = {
+            "id": "skill-craft-fixture",
+            "track": "skill",
+            "resource_id": "craft-fixture",
+            "resource_locator": locator,
+            "related_locators": [locator],
+            "conclusion": "approve",
+            "binds_to": {"package_integrity_sha256": pin},
+            "reviewed_at": "2026-11-16",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            reviews_dir = tmp_path / "reviews"
+            reviews_dir.mkdir()
+            (reviews_dir / "skill-craft-fixture.yaml").write_text(
+                yaml.safe_dump(review, sort_keys=False), encoding="utf-8"
+            )
+            skills = tmp_path / "skills.yaml"
+            skills.write_text("[]\n", encoding="utf-8")
+            gy = tmp_path / "graveyard.yaml"
+            gy.write_text("sites: []\n", encoding="utf-8")
+            old_reviews, old_skills, old_gy = (
+                secu.REVIEWS_DIR,
+                triage.SKILLS_PATH,
+                triage.GRAVEYARD_PATH,
+            )
+            secu.REVIEWS_DIR = reviews_dir
+            triage.SKILLS_PATH = skills
+            triage.GRAVEYARD_PATH = gy
+            try:
+                self.assertEqual(slug_id(locator), "craft-fixture")
+                result = triage_skill_locator(
+                    locator,
+                    reason="track: skill\n",
+                    name=None,
+                    write=False,
+                )
+                self.assertNotEqual(result.get("decision"), "duplicate")
+                draft = result.get("draft") or result.get("entry") or {}
+                self.assertEqual(draft.get("id"), "craft-fixture")
+                self.assertNotEqual(draft.get("id"), "github")
+                self.assertEqual(
+                    (draft.get("content_integrity") or {}).get("package_integrity"),
+                    pin,
+                )
+                matched = secu.find_matching_review(
+                    "skill", locator=locator, resource_id="craft-fixture"
+                )
+                self.assertIsNotNone(matched)
+                self.assertEqual(matched.get("id"), "skill-craft-fixture")
+                self.assertIsNone(
+                    secu.find_matching_review(
+                        "skill", locator=locator, resource_id="github"
+                    )
+                )
+                self.assertEqual(result.get("decision"), "accept_candidate")
+                adm = result.get("security_admission") or {}
+                self.assertTrue(adm.get("ok"))
+            finally:
+                secu.REVIEWS_DIR = old_reviews
+                triage.SKILLS_PATH = old_skills
+                triage.GRAVEYARD_PATH = old_gy
+
+    def test_two_github_skills_keep_distinct_ids_under_admission(self) -> None:
+        craft = "https://github.com/example-owner/craft-fixture/"
+        stitch = "https://github.com/example-owner/stitch-fixture/"
+        pin_c, pin_s = "b" * 64, "c" * 64
+        reviews = [
+            {
+                "id": "skill-craft-fixture",
+                "track": "skill",
+                "resource_id": "craft-fixture",
+                "resource_locator": craft,
+                "conclusion": "approve",
+                "binds_to": {"package_integrity_sha256": pin_c},
+                "reviewed_at": "2026-11-16",
+            },
+            {
+                "id": "skill-stitch-fixture",
+                "track": "skill",
+                "resource_id": "stitch-fixture",
+                "resource_locator": stitch,
+                "conclusion": "approve",
+                "binds_to": {"package_integrity_sha256": pin_s},
+                "reviewed_at": "2026-11-16",
+            },
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            reviews_dir = tmp_path / "reviews"
+            reviews_dir.mkdir()
+            for rev in reviews:
+                (reviews_dir / f"{rev['id']}.yaml").write_text(
+                    yaml.safe_dump(rev, sort_keys=False), encoding="utf-8"
+                )
+            skills = tmp_path / "skills.yaml"
+            skills.write_text("[]\n", encoding="utf-8")
+            gy = tmp_path / "graveyard.yaml"
+            gy.write_text("sites: []\n", encoding="utf-8")
+            old_reviews, old_skills, old_gy = (
+                secu.REVIEWS_DIR,
+                triage.SKILLS_PATH,
+                triage.GRAVEYARD_PATH,
+            )
+            secu.REVIEWS_DIR = reviews_dir
+            triage.SKILLS_PATH = skills
+            triage.GRAVEYARD_PATH = gy
+            try:
+                r1 = triage_skill_locator(craft, reason="track: skill\n", write=False)
+                r2 = triage_skill_locator(stitch, reason="track: skill\n", write=False)
+                self.assertNotEqual(r1.get("decision"), "duplicate")
+                self.assertNotEqual(r2.get("decision"), "duplicate")
+                id1 = (r1.get("draft") or r1.get("entry") or {}).get("id")
+                id2 = (r2.get("draft") or r2.get("entry") or {}).get("id")
+                self.assertEqual(id1, "craft-fixture")
+                self.assertEqual(id2, "stitch-fixture")
+                self.assertNotEqual(id1, id2)
+                self.assertIsNone(
+                    secu.find_matching_review(
+                        "skill", locator=craft, resource_id="stitch-fixture"
+                    )
+                )
+                self.assertIsNone(
+                    secu.find_matching_review(
+                        "skill", locator=stitch, resource_id="craft-fixture"
+                    )
+                )
+            finally:
+                secu.REVIEWS_DIR = old_reviews
+                triage.SKILLS_PATH = old_skills
+                triage.GRAVEYARD_PATH = old_gy
+
+    def test_same_slug_different_owner_write_duplicate_id_needs_human(self) -> None:
+        """Second GitHub repo with same name cannot steal / collide into the pool."""
+        first = "https://github.com/owner-a/shared-skill/"
+        second = "https://github.com/owner-b/shared-skill/"
+        pin = "d" * 64
+        review_a = {
+            "id": "skill-shared-a",
+            "track": "skill",
+            "resource_id": "shared-skill",
+            "resource_locator": first,
+            "conclusion": "approve",
+            "binds_to": {"package_integrity_sha256": pin},
+            "reviewed_at": "2026-11-16",
+        }
+        review_b = {
+            "id": "skill-shared-b",
+            "track": "skill",
+            "resource_id": "shared-skill",
+            "resource_locator": second,
+            "conclusion": "approve",
+            "binds_to": {"package_integrity_sha256": pin},
+            "reviewed_at": "2026-11-16",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            reviews_dir = tmp_path / "reviews"
+            reviews_dir.mkdir()
+            for rev in (review_a, review_b):
+                (reviews_dir / f"{rev['id']}.yaml").write_text(
+                    yaml.safe_dump(rev, sort_keys=False), encoding="utf-8"
+                )
+            skills = tmp_path / "skills.yaml"
+            skills.write_text("[]\n", encoding="utf-8")
+            gy = tmp_path / "graveyard.yaml"
+            gy.write_text("sites: []\n", encoding="utf-8")
+            status = tmp_path / "STATUS.md"
+            status.write_text("# status\n", encoding="utf-8")
+            old = (
+                secu.REVIEWS_DIR,
+                triage.SKILLS_PATH,
+                triage.GRAVEYARD_PATH,
+                triage.STATUS_PATH,
+            )
+            secu.REVIEWS_DIR = reviews_dir
+            triage.SKILLS_PATH = skills
+            triage.GRAVEYARD_PATH = gy
+            triage.STATUS_PATH = status
+            try:
+                r1 = triage_skill_locator(
+                    first, reason="track: skill\n", write=True
+                )
+                self.assertEqual(r1.get("decision"), "accept_candidate")
+                self.assertEqual((r1.get("entry") or {}).get("id"), "shared-skill")
+                r2 = triage_skill_locator(
+                    second, reason="track: skill\n", write=True
+                )
+                # Locator differs → not URL-duplicate; id collides → fail closed.
+                self.assertEqual(r2.get("decision"), "needs_human")
+                self.assertIn("duplicate_id", r2.get("write_error") or "")
+                pool = yaml.safe_load(skills.read_text(encoding="utf-8")) or []
+                self.assertEqual(len(pool), 1)
+                self.assertEqual(pool[0].get("id"), "shared-skill")
+                self.assertTrue(
+                    (pool[0].get("source") or {}).get("install_locator", "").startswith(
+                        "https://github.com/owner-a/"
+                    )
+                )
+            finally:
+                (
+                    secu.REVIEWS_DIR,
+                    triage.SKILLS_PATH,
+                    triage.GRAVEYARD_PATH,
+                    triage.STATUS_PATH,
+                ) = old
+
+
+class TestInvalidKindFailClosed(unittest.TestCase):
+    """Defect 2: illegal kind must not silently fall through to covers/rules."""
+
+    def test_parse_records_invalid_kind(self) -> None:
+        labels = parse_explicit_labels(
+            "kind: gallery\ncovers: landing, branding\n"
+        )
+        self.assertNotIn("kind", labels)
+        self.assertEqual(labels.get("invalid_kind"), "gallery")
+        self.assertEqual(labels.get("covers"), ["landing", "branding"])
+
+    def test_underscore_kind_normalizes_not_silently_dropped(self) -> None:
+        labels = parse_explicit_labels("kind: product_flow\ncovers: onboarding\n")
+        self.assertEqual(labels.get("kind"), "product-flow")
+        self.assertNotIn("invalid_kind", labels)
+        # Truly unknown underscore form still surfaces as invalid_kind.
+        bad = parse_explicit_labels("kind: not_a_real_kind\n")
+        self.assertEqual(bad.get("invalid_kind"), "not-a-real-kind")
+        self.assertNotIn("kind", bad)
+
+    @patch("triage.llm_covers_and_hint", return_value=None)
+    @patch("triage.fetch_html", return_value=(SAMPLE_HTML, 200, None))
+    @patch("triage.normalize_url", return_value="https://inspora.design/")
+    @patch("triage.find_duplicate", return_value=None)
+    @patch("triage.add_to_graveyard")
+    def test_issue40_gallery_kind_does_not_become_landing(
+        self, mock_gy, _dup, _norm, _fetch, _llm
+    ) -> None:
+        reason = (
+            "kind: gallery\n"
+            "covers: landing, branding, motion, logo\n\n"
+            "视觉设计灵感聚合站。\n"
+        )
+        result = triage_url(
+            "https://inspora.design/",
+            reason=reason,
+            write=True,
+        )
+        self.assertEqual(result.get("decision"), "needs_human")
+        self.assertEqual(result.get("invalid_kind"), "gallery")
+        self.assertEqual(result.get("note"), "invalid_kind:gallery")
+        self.assertNotEqual(result.get("decision"), "rejected_landing_freeze")
+        mock_gy.assert_not_called()
+        # Fetch / LLM must not run after invalid kind (fail before side effects).
+        _fetch.assert_not_called()
+        _llm.assert_not_called()
+
+    def test_inbox_comment_names_illegal_kind(self) -> None:
+        comment = build_inbox_comment(
+            {
+                "decision": "needs_human",
+                "track": "web",
+                "invalid_kind": "gallery",
+                "allowed_kinds": ["component", "landing", "product-flow", "system"],
+                "note": "invalid_kind:gallery",
+            }
+        )
+        self.assertIn("非法 kind", comment)
+        self.assertIn("gallery", comment)
+        self.assertIn("静默回退", comment)
+
+
+class TestInboxWorkflowDedup(unittest.TestCase):
+    """Dual-trigger collapse + reopened retry + http-without-label entry."""
+
+    def test_workflow_listens_to_opened_labeled_reopened(self) -> None:
+        text = INBOX_WORKFLOW.read_text(encoding="utf-8")
+        self.assertRegex(
+            text, r"types:\s*\[opened,\s*labeled,\s*reopened\]"
+        )
+
+    def test_job_if_partitions_opened_without_inbox_http(self) -> None:
+        """Third-party path: opened + title http + no inbox label."""
+        text = INBOX_WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("github.event.action == 'opened'", text)
+        self.assertIn("contains(github.event.issue.title, 'http')", text)
+        self.assertIn(
+            "!contains(join(github.event.issue.labels.*.name, ','), 'inbox')",
+            text,
+        )
+
+    def test_job_if_skips_opened_when_inbox_already_present(self) -> None:
+        """Create-with-inbox: only labeled runs (opened requires !inbox)."""
+        text = INBOX_WORKFLOW.read_text(encoding="utf-8")
+        # opened arm requires absence of inbox; labeled arm requires inbox label.
+        self.assertIn("github.event.label.name == 'inbox'", text)
+        self.assertIn("github.event.action == 'labeled'", text)
+
+    def test_ensure_inbox_label_after_comment(self) -> None:
+        text = INBOX_WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("Ensure inbox label", text)
+        # Label step must come after Comment so follow-up labeled can dedup.
+        comment_at = text.index("Comment and close")
+        label_at = text.index("Ensure inbox label")
+        self.assertGreater(label_at, comment_at)
+
+    def test_dedup_uses_python_policy(self) -> None:
+        text = INBOX_WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("inbox-dedup", text)
+        self.assertIn("steps.dedup.outputs.skip", text)
+
+    def test_labeled_after_pending_comment_skips(self) -> None:
+        pending = "🛡️ **pending_security_review**：缺少审查\n- admission: `missing`"
+        self.assertTrue(inbox_dedup_should_skip("labeled", [pending]))
+        self.assertTrue(inbox_dedup_should_skip("opened", [pending]))
+
+    def test_reopened_after_pending_does_not_skip(self) -> None:
+        pending = "🛡️ **pending_security_review**：缺少审查\n- admission: `missing`"
+        human = "👀 **needs_human**：初筛无法自动确认"
+        illegal = "⚠️ **非法 kind**：`gallery` 不是轨 `web` 的合法类型"
+        for body in (pending, human, illegal):
+            self.assertFalse(
+                inbox_dedup_should_skip("reopened", [body]),
+                body,
+            )
+
+    def test_reopened_after_terminal_still_skips(self) -> None:
+        for body in (
+            "✅ 已入 **skill candidate**：`craft`",
+            "⏭️ 重复：已在池或墓碑中 — `{'id': 'x'}`",
+            "🚫 当前冻结普通 landing 新站（Web 轨；见 STATUS.md）。",
+            "🚫 **rejected_security_blocked**：存在 conclusion=block",
+            "🚫 非白名单作者。本仓 inbox 仅接受维护者 / 授权 Bot 投喂。已关闭。",
+            "🚫 未找到 URL。请把完整 URL 放在标题或正文。",
+        ):
+            self.assertTrue(
+                inbox_dedup_should_skip("reopened", [body]),
+                body,
+            )
+
+    def test_no_url_and_triage_other_comments_have_dedup_markers(self) -> None:
+        no_url = build_inbox_comment({"decision": "rejected_no_url"})
+        self.assertIn("🚫 未找到 URL", no_url)
+        self.assertTrue(inbox_dedup_should_skip("labeled", [no_url]))
+        other = build_inbox_comment({"decision": "weird", "track": "web"})
+        self.assertIn("📋 **triage_other**", other)
+        self.assertTrue(inbox_dedup_should_skip("labeled", [other]))
+        # Unknown conclusions remain retryable on reopen.
+        self.assertFalse(inbox_dedup_should_skip("reopened", [other]))
+
+    def test_broad_ban_emoji_alone_is_not_terminal_on_reopen(self) -> None:
+        # Narrow 🚫 matching: a random ban-emoji comment must not block retry.
+        self.assertFalse(
+            inbox_dedup_should_skip("reopened", ["🚫 something unrelated"])
+        )
+
+    def test_cli_inbox_dedup_observable(self) -> None:
+        import json
+        import subprocess
+
+        payload = json.dumps(
+            {
+                "bodies": [
+                    "🛡️ **pending_security_review**：x",
+                ]
+            }
+        )
+        for action, expect in (("labeled", "1"), ("reopened", "0")):
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "triage.py"),
+                    "inbox-dedup",
+                    "--action",
+                    action,
+                ],
+                input=payload,
+                text=True,
+                capture_output=True,
+                check=True,
+                cwd=str(ROOT),
+            )
+            self.assertEqual(proc.stdout.strip().splitlines()[-1], expect, action)
+
+    def test_marker_sets_disjoint_and_cover_build_inbox_comment(self) -> None:
+        # Retryable must not be treated as terminal.
+        for m in INBOX_DEDUP_RETRYABLE_MARKERS:
+            self.assertNotIn(m, INBOX_DEDUP_TERMINAL_MARKERS)
+        self.assertEqual(
+            set(INBOX_DEDUP_ANY_MARKERS),
+            set(INBOX_DEDUP_TERMINAL_MARKERS) | set(INBOX_DEDUP_RETRYABLE_MARKERS),
+        )
+        # build_inbox_comment outputs must be detectable by the marker sets.
+        pending = build_inbox_comment(
+            {
+                "decision": "pending_security_review",
+                "track": "skill",
+                "security_admission": {"status": "missing", "reason": "x"},
+                "draft": {"id": "craft"},
+            }
+        )
+        self.assertTrue(
+            any(m in pending for m in INBOX_DEDUP_RETRYABLE_MARKERS)
+        )
+        accepted = build_inbox_comment(
+            {
+                "decision": "accept_candidate",
+                "track": "web",
+                "entry": {
+                    "id": "x",
+                    "url": "https://example.com/",
+                    "kind": "component",
+                    "covers": [],
+                },
+                "label_source": "rules",
+            }
+        )
+        self.assertTrue(any(m in accepted for m in INBOX_DEDUP_TERMINAL_MARKERS))
+
+
+class TestPrNoneNeverEmitted(unittest.TestCase):
+    """Defect 4: missing PR number must omit the phrase, not print PR #None."""
+
+    def test_format_pr_ref_none_empty(self) -> None:
+        self.assertEqual(format_pr_ref(None), "")
+        self.assertEqual(format_pr_ref("None"), "")
+        self.assertEqual(format_pr_ref("null"), "")
+        self.assertEqual(format_pr_ref(0), "")
+        self.assertEqual(format_pr_ref(-1), "")
+        self.assertEqual(format_pr_ref(39), "PR #39")
+        self.assertEqual(format_pr_ref("41"), "PR #41")
+
+    def test_format_security_review_cite_omits_none(self) -> None:
+        with_none = format_security_review_cite("web-inspora-2026-11-11", None)
+        self.assertNotIn("PR #None", with_none)
+        self.assertNotIn("#None", with_none)
+        self.assertIn("web-inspora-2026-11-11", with_none)
+        with_pr = format_security_review_cite("web-inspora-2026-11-11", 39)
+        self.assertIn("PR #39", with_pr)
+        self.assertIn("web-inspora-2026-11-11", with_pr)
+
+    def test_strip_pr_none_from_feeder_body_echo(self) -> None:
+        raw = (
+            "配套 security review 见 PR #None（web-inspora-2026-11-11）。"
+            "外链学习参考。"
+        )
+        cleaned = strip_pr_none_mentions(raw)
+        self.assertNotIn("PR #None", cleaned)
+        self.assertNotIn("#None", cleaned)
+        self.assertIn("web-inspora-2026-11-11", cleaned)
+
+    def test_strip_does_not_rewrite_unrelated_jian_paren(self) -> None:
+        # Narrowed strip: must not globally rewrite every 「见（」.
+        raw = "详见（手册）。另见（附录）。"
+        self.assertEqual(strip_pr_none_mentions(raw), raw)
+
+    def test_inbox_comment_strips_pr_none_in_json_fallback(self) -> None:
+        comment = build_inbox_comment(
+            {
+                "decision": "weird",
+                "track": "web",
+                "note": "配套 security review 见 PR #None（web-inspora-2026-11-11）。",
+            }
+        )
+        self.assertNotIn("PR #None", comment)
+        self.assertNotIn("#None", comment)
+        self.assertIn("📋 **triage_other**", comment)
+
+    def test_skill_search_hint_strips_pr_none_before_pool_write(self) -> None:
+        locator = "https://github.com/example-owner/hint-skill/"
+        pin = "e" * 64
+        review = {
+            "id": "skill-hint",
+            "track": "skill",
+            "resource_id": "hint-skill",
+            "resource_locator": locator,
+            "conclusion": "approve",
+            "binds_to": {"package_integrity_sha256": pin},
+            "reviewed_at": "2026-11-16",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            reviews_dir = tmp_path / "reviews"
+            reviews_dir.mkdir()
+            (reviews_dir / "skill-hint.yaml").write_text(
+                yaml.safe_dump(review, sort_keys=False), encoding="utf-8"
+            )
+            skills = tmp_path / "skills.yaml"
+            skills.write_text("[]\n", encoding="utf-8")
+            gy = tmp_path / "graveyard.yaml"
+            gy.write_text("sites: []\n", encoding="utf-8")
+            status = tmp_path / "STATUS.md"
+            status.write_text("# status\n", encoding="utf-8")
+            old = (
+                secu.REVIEWS_DIR,
+                triage.SKILLS_PATH,
+                triage.GRAVEYARD_PATH,
+                triage.STATUS_PATH,
+            )
+            secu.REVIEWS_DIR = reviews_dir
+            triage.SKILLS_PATH = skills
+            triage.GRAVEYARD_PATH = gy
+            triage.STATUS_PATH = status
+            try:
+                reason = (
+                    "track: skill\n"
+                    "配套 security review 见 PR #None（skill-hint）。\n"
+                )
+                result = triage_skill_locator(
+                    locator, reason=reason, write=True
+                )
+                self.assertEqual(result.get("decision"), "accept_candidate")
+                entry = result.get("entry") or {}
+                self.assertNotIn("PR #None", entry.get("search_hint") or "")
+                pool = yaml.safe_load(skills.read_text(encoding="utf-8")) or []
+                self.assertEqual(len(pool), 1)
+                self.assertNotIn("PR #None", pool[0].get("search_hint") or "")
+            finally:
+                (
+                    secu.REVIEWS_DIR,
+                    triage.SKILLS_PATH,
+                    triage.GRAVEYARD_PATH,
+                    triage.STATUS_PATH,
+                ) = old
+
+
+class TestParseNameLabel(unittest.TestCase):
+    def test_name_from_issue_body(self) -> None:
+        labels = parse_explicit_labels("track: skill\nname: craft\n")
+        self.assertEqual(labels.get("name"), "craft")
+        self.assertEqual(labels.get("track"), "skill")
+
+
+class TestDocsRetryAndPrNone(unittest.TestCase):
+    def test_readme_documents_reopen_retry_and_no_pr_none(self) -> None:
+        text = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("先关闭再重开", text)
+        self.assertIn("PR #None", text)
+
+    def test_issue_template_documents_reopen_and_pr_none(self) -> None:
+        text = (
+            ROOT / ".github" / "ISSUE_TEMPLATE" / "inbox.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("先关闭再重开", text)
+        self.assertIn("PR #None", text)
+
+
+class TestInboxIssueTemplateParse(unittest.TestCase):
+    """Unmodified GitHub issue template must not invent track/kind/covers."""
+
+    @staticmethod
+    def _template_raw() -> str:
+        return (
+            ROOT / ".github" / "ISSUE_TEMPLATE" / "inbox.md"
+        ).read_text(encoding="utf-8")
+
+    @classmethod
+    def _template_issue_body(cls) -> str:
+        """Body as GitHub creates it (YAML front matter stripped)."""
+        raw = cls._template_raw()
+        if raw.startswith("---"):
+            parts = raw.split("---", 2)
+            if len(parts) >= 3:
+                return parts[2]
+        return raw
+
+    @classmethod
+    def _template_default_title(cls) -> str:
+        raw = cls._template_raw()
+        m = re.search(r'(?m)^title:\s*["\']?(.+?)["\']?\s*$', raw)
+        assert m, "issue template must declare title:"
+        return m.group(1).strip().strip('"').strip("'")
+
+    def test_unmodified_template_has_empty_track_kind_and_covers(self) -> None:
+        body = self._template_issue_body()
+        labels = parse_explicit_labels(body)
+        self.assertNotIn("track", labels)
+        self.assertNotIn("kind", labels)
+        self.assertNotIn("invalid_kind", labels)
+        self.assertNotIn("covers", labels)
+        # Guard: template must not pre-fill concrete track/kind values.
+        self.assertNotRegex(
+            body,
+            r"(?m)^[ \t]*track[ \t]*:[ \t]*(web|video|skill)\b",
+        )
+        self.assertNotRegex(
+            body,
+            r"(?m)^[ \t]*kind[ \t]*:[ \t]*[a-z0-9_-]+",
+        )
+
+    def test_template_plus_track_skill_line_parses_skill(self) -> None:
+        body = self._template_issue_body() + "\ntrack: skill\n"
+        labels = parse_explicit_labels(body)
+        self.assertEqual(labels.get("track"), "skill")
+        self.assertNotIn("kind", labels)
+        self.assertNotIn("covers", labels)
+
+    def test_unmodified_template_title_and_body_skip_fetch(self) -> None:
+        """Default title must not look like a URL; inbox path → rejected_no_url."""
+        import os
+        from unittest.mock import patch
+
+        title = self._template_default_title()
+        body = self._template_issue_body()
+        self.assertFalse(title.startswith("http"))
+        self.assertNotIn("://", title)
+        with patch.dict(
+            os.environ,
+            {"ISSUE_TITLE": title, "ISSUE_BODY": body},
+            clear=False,
+        ):
+            with patch("triage.triage_url") as mock_triage:
+                with patch("triage.fetch_html") as mock_fetch:
+                    with patch("triage.normalize_url") as mock_norm:
+                        with patch("builtins.print"):
+                            rc = triage.cmd_inbox_from_env()
+                        self.assertEqual(rc, 0)
+                        mock_triage.assert_not_called()
+                        mock_fetch.assert_not_called()
+                        mock_norm.assert_not_called()
+        result = json.loads(
+            Path("/tmp/triage-result.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(result.get("decision"), "rejected_no_url")
+        self.assertIn("未找到 URL", result.get("comment") or "")
+
+    def test_empty_kind_line_does_not_steal_covers_as_kind(self) -> None:
+        labels = parse_explicit_labels("track: web\nkind:\ncovers: landing\n")
+        self.assertNotIn("kind", labels)
+        self.assertNotIn("invalid_kind", labels)
+        self.assertEqual(labels.get("covers"), ["landing"])
+
+    def test_empty_covers_line_does_not_eat_html_comment(self) -> None:
+        labels = parse_explicit_labels("covers:\n\n<!-- note -->\n")
+        self.assertNotIn("covers", labels)
+
+
+if __name__ == "__main__":
+    unittest.main()
