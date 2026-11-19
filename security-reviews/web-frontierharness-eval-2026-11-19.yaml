@@ -1,0 +1,109 @@
+# Static security admission review for frontierharness-eval (web track).
+# Conclusion APPROVE: article bytes stable under the triage UA across
+# 4 probes (single sha256), substantive static body (full article text),
+# zero FLAG_PATTERNS hits. Link-level design reference only; grants no
+# execution/credentials. Content remains untrusted data.
+id: web-frontierharness-eval-2026-11-19
+track: web
+resource_id: frontierharness-eval
+resource_locator: https://runta.com/blog/introducing-frontierharness-eval-v1-1/
+reviewed_at: "2026-11-19"
+reviewer:
+  kind: cloud-agent-static-review
+  context: >-
+    Muse (pool owner's agent) feeding one web candidate at the owner's
+    explicit direction; read-only HTTPS GET with the triage User-Agent;
+    no HTML/JS execution, no account creation, no form submit; fetched
+    content treated as untrusted text only. Fetch executed with requests
+    under the triage UA because triage.fetch_html's is_allowed_fetch_url
+    SSRF guard rejects every host inside this sandbox (all DNS resolves
+    to 198.18.0.0/15 proxy addresses); the fetch convention (UA,
+    Response.text -> utf-8 sha256) is identical to triage.fetch_html.
+conclusion: approve
+binds_to:
+  content_sha256: 43c0d9bb797389049d3f19062f6f0c591d4bb23a52f4d8a08b841e281dd888bc
+  fetched_url_source: https://runta.com/blog/introducing-frontierharness-eval-v1-1/
+  fetched_url_final: https://runta.com/blog/introducing-frontierharness-eval-v1-1/
+  http_status: 200
+  response_bytes: 33675
+  fetched_at: "2026-11-19T03:58:00Z"
+  user_agent: "design-for-you-triage/1.0 (+https://github.com/Bububuger/design-for-you; research)"
+  fetch_mode: "requests with triage USER_AGENT: Response.text then sha256(utf-8); triage.fetch_html wrapper blocked by sandbox DNS (see reviewer.context)"
+  live_pin_stable: true
+  snapshot_archive_only: false
+scope:
+  method: static-fetch-hash-and-read
+  live_admission: eligible
+  primary_evidence: homepage.html
+  evidence_dir: security-reviews/evidence/frontierharness-eval/
+  evidence_complete: true
+  covered:
+    - article page HTML snapshot bytes (security-reviews/evidence/frontierharness-eval/homepage.html)
+    - fetch metadata (security-reviews/evidence/frontierharness-eval/fetch.json) recording source/final URL, UA, timestamp, fetch mode, 4-probe stability result
+    - visible-text + raw-HTML heuristic scan via scripts/security_admission.py FLAG_PATTERNS (hits require judgment; zero != safe)
+    - design-content assessment of the article's figures as a data-visualization reference (see finding F4)
+  not_executed:
+    - page JavaScript / interactive chart runtime (charts are client-rendered; static body carries the full article text and figure captions/specs)
+    - login, signup, form submit, or account creation
+  not_reviewed:
+    - pages beyond this article (runta.com homepage, frontierharness.org leaderboard, other posts)
+    - runtime/auth/paywall behavior
+  integrity_note: >-
+    Snapshot bytes are archived under evidence_dir for independent
+    audit; binds_to.content_sha256 equals the on-disk homepage.html
+    digest under the triage fetch convention.
+findings:
+  - id: F1
+    severity: note
+    category: content_nature
+    judgment: untrusted_reference_only
+    summary: >-
+      Runta is a third-party eval vendor; this article is a harness
+      evaluation report. Pool inclusion is link-level reference only;
+      content remains untrusted data and grants no execution or
+      access rights.
+  - id: F2
+    severity: note
+    category: keyword_scan
+    judgment: no_hits_not_proof_of_safety
+    summary: >-
+      Repo FLAG_PATTERNS found no authority-override, credential-exfiltration,
+      dangerous-shell, remote-install, or messaging-inducement spans in
+      visible text or raw HTML. Zero keyword hits are NOT proof of
+      safety; they only record that these heuristics did not fire on
+      the committed snapshot.
+  - id: F3
+    severity: note
+    category: admission_eligibility
+    judgment: live_admission_eligible
+    summary: >-
+      Article bytes identical across 4 probes under the triage UA
+      (single sha256 43c0d9bb...), and the static body is substantive
+      (15,503 visible chars: full article text, methodology table and
+      figure captions), not an empty SPA shell; a stable live pin can
+      honestly be claimed.
+  - id: F4
+    severity: note
+    category: design_value
+    judgment: covers_chart_bounty_gap
+    summary: >-
+      Admission rationale is the page's data-visualization design, per
+      the pool owner's direction: Pareto-frontier scatter (cost per
+      task x pass rate) with the frontier line drawn; rank bump chart
+      of harness cost ranks across 5 models; harness x model heatmap;
+      log-scale range charts with a permutation 'chance' baseline next
+      to real values; bootstrap win-probabilities instead of bare
+      ranks; cost-decomposition stacked bars (by token type and by
+      trial outcome); one global model filter re-rendering every
+      figure; methodology table up front mapping each metric to the
+      figures that use it. Covers the STATUS bounty gap 'chart' for
+      data-dense dev-tool / observability interfaces.
+unverified:
+  - Runtime behavior of the interactive charts (not executed; assessed from static text, captions and figure specs)
+  - Any page beyond this article snapshot
+  - Future mutations of hosted content after this snapshot
+  - Account, billing, upload, and paywall flows (not exercised)
+  - Hidden prompt / spoofed-authority / exfil content inside unexecuted scripts or post-hydration DOM
+permissions_granted: []
+trust: untrusted-data
+actual_test_status_observed: not_tested

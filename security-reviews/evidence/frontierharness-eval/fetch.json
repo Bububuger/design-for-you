@@ -1,0 +1,32 @@
+{
+  "resource_id": "frontierharness-eval",
+  "source_url": "https://runta.com/blog/introducing-frontierharness-eval-v1-1/",
+  "final_url": "https://runta.com/blog/introducing-frontierharness-eval-v1-1/",
+  "http_status": 200,
+  "fetched_at": "2026-11-19T03:58:00Z",
+  "user_agent": "design-for-you-triage/1.0 (+https://github.com/Bububuger/design-for-you; research)",
+  "fetch_mode": "requests with triage USER_AGENT; Response.text then sha256(utf-8). triage.fetch_html wrapper not used: its is_allowed_fetch_url SSRF guard rejects every host in this sandbox (all DNS resolves to 198.18.0.0/15 proxy addresses). Fetch convention (UA, encoding, hash) identical to triage.fetch_html.",
+  "content_sha256": "43c0d9bb797389049d3f19062f6f0c591d4bb23a52f4d8a08b841e281dd888bc",
+  "response_bytes": 33675,
+  "stability_probe": {
+    "fetches": 4,
+    "unique_sha256": [
+      "43c0d9bb797389049d3f19062f6f0c591d4bb23a52f4d8a08b841e281dd888bc"
+    ],
+    "stable": true
+  },
+  "analysis": {
+    "bytes": 33675,
+    "visible_text_len": 15503,
+    "script_src_count": 1,
+    "script_srcs_sample": [
+      "/_astro/_...slug_.astro_astro_type_script_index_0_lang.vr_NPHaM.js"
+    ],
+    "external_link_count": 25,
+    "spa_shell": false,
+    "flag_hits_visible": [],
+    "flag_hits_raw": []
+  },
+  "decision_reason": "article_bytes_stable_under_triage_ua_live_pin_ok_substantive_static_body",
+  "proposed_conclusion": "approve"
+}

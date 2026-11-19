@@ -475,3 +475,21 @@
   search_hint: 浏览 empty-state / 空状态、骨架屏与加载态等用户反馈 UX 模式文档
   auth: none
   added_at: '2026-11-01'
+- id: frontierharness-eval
+  name: FrontierHarness Eval
+  url: https://runta.com/blog/introducing-frontierharness-eval-v1-1/
+  aliases: []
+  status: candidate
+  kind: component
+  covers:
+  - chart
+  - dashboard
+  - data-table
+  search_hint: 评测报告页数据可视化：Pareto 前沿散点、名次 bump chart、热力矩阵、对数区间图+置换基线、成本分解堆叠条、全局筛选器联动全图
+  auth: none
+  added_at: '2026-11-19'
+  content_integrity:
+    algorithm: sha256
+    content_sha256: 43c0d9bb797389049d3f19062f6f0c591d4bb23a52f4d8a08b841e281dd888bc
+  security_review_id: web-frontierharness-eval-2026-11-19
+  security_admission: reviewed-approve-bound

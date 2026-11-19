@@ -1,0 +1,201 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Introducing FrontierHarness Eval v1.1 â RUNTA</title><meta name="description" content="FrontierHarness Eval v1.1 ran 22 coding-agent harnesses with 5 models on the same 62 tasks, 4 times each: 27,280 runs. The best-value harness was different with each model, and cost ranks moved far between models. With the model fixed, the most expensive harness cost 1.8 to 5.0 times as much per task as the cheapest."><meta name="author" content="Runta"><meta property="og:title" content="Introducing FrontierHarness Eval v1.1 â RUNTA"><meta property="og:description" content="FrontierHarness Eval v1.1 ran 22 coding-agent harnesses with 5 models on the same 62 tasks, 4 times each: 27,280 runs. The best-value harness was different with each model, and cost ranks moved far between models. With the model fixed, the most expensive harness cost 1.8 to 5.0 times as much per task as the cheapest."><meta property="og:type" content="article"><meta property="og:url" content="https://runta.com/blog/introducing-frontierharness-eval-v1-1/"><meta property="og:image" content="https://runta.com/social/blog-introducing-frontierharness-eval-v1-1.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="Introducing FrontierHarness Eval v1.1 â RUNTA social preview"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content="@runtahq"><meta name="twitter:title" content="Introducing FrontierHarness Eval v1.1 â RUNTA"><meta name="twitter:description" content="FrontierHarness Eval v1.1 ran 22 coding-agent harnesses with 5 models on the same 62 tasks, 4 times each: 27,280 runs. The best-value harness was different with each model, and cost ranks moved far between models. With the model fixed, the most expensive harness cost 1.8 to 5.0 times as much per task as the cheapest."><meta name="twitter:image" content="https://runta.com/social/blog-introducing-frontierharness-eval-v1-1.png"><meta name="twitter:image:alt" content="Introducing FrontierHarness Eval v1.1 â RUNTA social preview"><link rel="canonical" href="https://runta.com/blog/introducing-frontierharness-eval-v1-1/"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet"><link rel="stylesheet" href="/css/main.css"><script>(function(){var host=location.hostname;var send=["runta.com","www.runta.com"].indexOf(host)!==-1;var debug=!send;var variant="control";function emit(name,params){params=Object.assign({experiment_id:"hero_layout",variant_id:variant},params||{});try{if(send&&typeof window.gtag==="function"){window.gtag("event",name,params);return;}if(debug)console.debug("[analytics]",name,params);}catch(err){}}document.addEventListener("click",function(event){try{var target=event.target;if(target&&target.nodeType===3)target=target.parentElement;if(!target||!target.closest)return;var cta=target.closest("[data-analytics-cta]");if(!cta)return;emit(cta.getAttribute("data-analytics-event")||"cta_click",{cta_id:cta.getAttribute("data-analytics-cta"),cta_location:cta.getAttribute("data-analytics-location")||undefined,cta_text:(cta.textContent||"").replace(/\s+/g," ").trim(),link_url:cta.href});}catch(err){}},true);if(!send)return;window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}window.gtag=gtag;gtag("js",new Date());gtag("config","G-VSK9MRB513");gtag("set","user_properties",{hero_layout:variant});var s=document.createElement("script");s.async=true;s.src="https://www.googletagmanager.com/gtag/js?id="+"G-VSK9MRB513";document.head.appendChild(s);})();</script><link rel="stylesheet" href="/_astro/FrontierHarnessScatter.DtWaix1Z.css"><link rel="stylesheet" href="/_astro/hydrate.B0QYulag.css"><link rel="stylesheet" href="/_astro/BaseLayout.uiKphlVr.css"><link rel="stylesheet" href="/_astro/hydrate.C0ZBFTdi.css"></head><body><div class="bg-effects"><div class="bg-ambient"></div></div><div class="site-wrapper"><header class="site-header"><div class="shared-site-header" data-astro-cid-4v7uyvgl><div class="shared-site-header-primary" data-astro-cid-4v7uyvgl><a href="/" class="shared-site-brand" data-astro-cid-4v7uyvgl><img src="/img/runta-logo.png" alt="Runta" data-astro-cid-4v7uyvgl><span translate="no" data-astro-cid-4v7uyvgl>Runta</span></a><nav class="shared-site-nav" aria-label="Primary navigation" data-astro-cid-4v7uyvgl><details class="shared-site-resources" data-astro-cid-4v7uyvgl><summary data-astro-cid-4v7uyvgl>Resources<svg viewBox="0 0 24 24" aria-hidden="true" data-astro-cid-4v7uyvgl><path d="m6 9 6 6 6-6" data-astro-cid-4v7uyvgl></path></svg></summary><div class="shared-site-resource-menu" data-astro-cid-4v7uyvgl><a href="/docs/" data-astro-cid-4v7uyvgl>Docs</a><a href="/blog/" aria-current="page" data-astro-cid-4v7uyvgl>Blog</a></div></details><a href="/pricing/" data-astro-cid-4v7uyvgl>Pricing</a><a href="/about/" data-astro-cid-4v7uyvgl>About</a><a href="/careers/" data-astro-cid-4v7uyvgl>Careers</a></nav></div><div class="shared-site-actions" data-astro-cid-4v7uyvgl><nav class="shared-site-socials" aria-label="Runta social links" data-astro-cid-4v7uyvgl><a href="https://discord.gg/62d4bkaTnS" target="_blank" rel="noreferrer" aria-label="Discord" title="Discord" data-astro-cid-4v7uyvgl><svg viewBox="0 0 24 24" aria-hidden="true" data-astro-cid-4v7uyvgl><path d="M7.5 5.5h9A3.5 3.5 0 0 1 20 9v4a3.5 3.5 0 0 1-3.5 3.5h-4.2L9 19v-2.5H7.5A3.5 3.5 0 0 1 4 13V9a3.5 3.5 0 0 1 3.5-3.5Z" data-astro-cid-4v7uyvgl></path></svg></a><a href="https://github.com/runta-dev" target="_blank" rel="noreferrer" aria-label="GitHub" title="GitHub" data-astro-cid-4v7uyvgl><svg viewBox="0 0 24 24" aria-hidden="true" class="shared-site-social-fill" data-astro-cid-4v7uyvgl><path d="M12 2C6.48 2 2 6.58 2 12.23c0 4.52 2.87 8.35 6.84 9.71.5.1.68-.22.68-.49 0-.24-.01-1.05-.01-1.9-2.78.62-3.37-1.21-3.37-1.21-.45-1.18-1.11-1.49-1.11-1.49-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.89 1.57 2.34 1.12 2.91.85.09-.67.35-1.12.64-1.38-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05A9.32 9.32 0 0 1 12 6.95c.85 0 1.71.12 2.51.35 1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.8-4.57 5.05.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.8 0 .27.18.59.69.49A10.24 10.24 0 0 0 22 12.23C22 6.58 17.52 2 12 2Z" data-astro-cid-4v7uyvgl></path></svg></a><a href="https://x.com/runta" target="_blank" rel="noreferrer" aria-label="X" title="X" data-astro-cid-4v7uyvgl><svg viewBox="0 0 24 24" aria-hidden="true" class="shared-site-social-fill" data-astro-cid-4v7uyvgl><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817-5.967 6.817H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z" data-astro-cid-4v7uyvgl></path></svg></a><a href="https://www.linkedin.com/company/runta-inc/" target="_blank" rel="noreferrer" aria-label="LinkedIn" title="LinkedIn" data-astro-cid-4v7uyvgl><svg viewBox="0 0 24 24" aria-hidden="true" class="shared-site-social-fill" data-astro-cid-4v7uyvgl><path d="M6.5 8.25H3.25V21H6.5V8.25ZM4.88 3A1.88 1.88 0 1 0 4.87 6.75 1.88 1.88 0 0 0 4.88 3ZM21 13.7c0-3.84-2.05-5.63-4.79-5.63-2.2 0-3.19 1.22-3.74 2.07V8.25H9.22V21h3.25v-6.31c0-1.66.31-3.27 2.37-3.27 2.03 0 2.05 1.9 2.05 3.38V21H21v-7.3Z" data-astro-cid-4v7uyvgl></path></svg></a></nav><a class="shared-site-cta" href="https://dashboard.runta.com/login" data-analytics-cta="header_free_trial" data-analytics-location="header" data-analytics-event="free_trial_click" data-astro-cid-4v7uyvgl>Start free with $50 credit<svg viewBox="0 0 24 24" aria-hidden="true" data-astro-cid-4v7uyvgl><path d="M5 12h14" data-astro-cid-4v7uyvgl></path><path d="m12 5 7 7-7 7" data-astro-cid-4v7uyvgl></path></svg></a><details class="shared-site-mobile" data-astro-cid-4v7uyvgl><summary aria-label="Toggle navigation menu" data-astro-cid-4v7uyvgl><svg class="shared-site-menu-icon" viewBox="0 0 24 24" aria-hidden="true" data-astro-cid-4v7uyvgl><path d="M4 12h16M4 6h16M4 18h16" data-astro-cid-4v7uyvgl></path></svg><svg class="shared-site-close-icon" viewBox="0 0 24 24" aria-hidden="true" data-astro-cid-4v7uyvgl><path d="M18 6 6 18M6 6l12 12" data-astro-cid-4v7uyvgl></path></svg></summary><nav class="shared-site-mobile-menu" aria-label="Mobile navigation" data-astro-cid-4v7uyvgl><div class="shared-site-mobile-title" data-astro-cid-4v7uyvgl>Resources</div><a class="shared-site-mobile-resource" href="/docs/" data-astro-cid-4v7uyvgl>Docs</a><a class="shared-site-mobile-resource" href="/blog/" data-astro-cid-4v7uyvgl>Blog</a><a href="/pricing/" data-astro-cid-4v7uyvgl>Pricing</a><a href="/about/" data-astro-cid-4v7uyvgl>About</a><a href="/careers/" data-astro-cid-4v7uyvgl>Careers</a><div class="shared-site-mobile-title" data-astro-cid-4v7uyvgl>Social</div><a href="https://discord.gg/62d4bkaTnS" target="_blank" rel="noreferrer" data-astro-cid-4v7uyvgl>Discord</a><a href="https://github.com/runta-dev" target="_blank" rel="noreferrer" data-astro-cid-4v7uyvgl>GitHub</a><a href="https://x.com/runta" target="_blank" rel="noreferrer" data-astro-cid-4v7uyvgl>X</a><a href="https://www.linkedin.com/company/runta-inc/" target="_blank" rel="noreferrer" data-astro-cid-4v7uyvgl>LinkedIn</a></nav></details></div></div></header><main class="site-main"><div class="container"><a href="/blog/" class="back-link">All Blog</a><nav class="post-toc" aria-label="Contents"><p class="post-toc-title">Contents</p><ol><li><a href="#tldr">TL;DR</a></li><li><a href="#result">Result</a></li><li><a href="#why-we-built-frontierharness-eval-v11">Why We Built FrontierHarness Eval v1.1</a></li><li><a href="#what-we-tested">What We Tested</a></li><li><a href="#setup-and-scoring">Setup and Scoring</a></li><li><a href="#results-by-model">Results by Model</a></li><li><a href="#the-harness-changes-the-cost">The Harness Changes the Cost</a></li><li><a href="#does-a-simpler-harness-cost-less">Does a Simpler Harness Cost Less?</a></li><li><a href="#where-the-cost-comes-from">Where the Cost Comes From</a></li><li><a href="#what-the-best-value-harnesses-share">What the Best-Value Harnesses Share</a></li><li><a href="#limitations-and-future-work">Limitations and Future Work</a></li><li><a href="#conclusion">Conclusion</a></li><li><a href="#appendix-reference-tables">Appendix: Reference Tables</a></li><li><a href="#references">References</a></li></ol></nav><article><header class="post-header"><h1 class="post-title">Introducing <em>FrontierHarness</em> Eval v1.1</h1><div class="post-meta"><time datetime="2026-11-17">November 17, 2026</time><span class="post-meta-sep">Â·</span><span>14 min read</span><span class="post-meta-sep">Â·</span><span>Shilin Zhu</span></div><div class="post-tags" style="margin-top: 1rem;"><span class="post-tag">agents</span><span class="post-tag">harness</span><span class="post-tag">evaluation</span><span class="post-tag">benchmark</span><span class="post-tag">harbor</span></div></header><div class="post-content"><h2 id="tldr">TL;DR</h2>
+<p>We partnered with <a href="https://www.baseten.co/">Baseten</a> to build the largest-scale harness leaderboard using 83B tokens across 27,280 agent runs. We wanted to answer two questions: <strong>when you switch your model, should you consider switching the harness too? What is the best harness for each model?</strong></p>
+<p>Previously, our <a href="/blog/introducing-frontierharness-eval/">v1.0 FrontierHarness leaderboard</a> ranked harnesses on a single model, Kimi K3.</p>
+<p>V1.1 expands the benchmark to 22 harnesses Ã 5 models Ã 62 tasks Ã 4 attempts, 76Ã the size of v1.0.</p>
+<p><strong>Through our experiments, we found that you should consider switching harnesses when switching models to maximize your experience.</strong></p>
+<p>Each model had a different best-value (pass rate vs. cost) harness: Codex CLI with GLM-5.3, Pi with GLM-5.3 Flash, ZCode with DeepSeek V4.1 Flash 1017, Oh My Pi with Muse and Alma with Kimi-K3. <strong>Cost ranks moved far between models.</strong></p>
+<p>By cost per task, the median harness moved 11 of 22 places, and Codex CLI went from 1st with GLM-5.3 to 16th with Kimi-K3.</p>
+<hr>
+<h2 id="result">Result</h2>
+<p><strong>Figure 1. Cost per task and pass rate of each harness</strong></p>
+<p>Each point is one harness: further left is a lower average cost per task, and higher is a higher pass rate. The orange line joins the harnesses that no other harness beats in both cost and pass rate. Select a model to filter all figures of this post.</p>
+<div class="harness-scores-embed" data-harness-scores="">
+<div class="harness-scores">
+<div class="frontier-scatter-embed">
+<noscript>
+<img src="/blog/introducing-frontierharness-eval-v1-1/harness-scatter-all-models.png" alt="Average cost per task against pass rate of the 22 harnesses, all models. OpenCode v2, Pi, Codex CLI and ZCode form the frontier.">
+</noscript>
+</div>
+</div>
+</div>
+<div data-harness-figure="leaders">
+<noscript><p><em>This figure is interactive and needs JavaScript.</em></p></noscript>
+</div>
+<p>Over all models, four harnesses are on the line: OpenCode v2 (lowest cost per task, $0.561), Pi, Codex CLI and ZCode (highest pass rate, 61.9%). The others cost up to 1.6 times as much and passed 50.6% to 60.2%.</p>
+<p>Each card names the best-value harness for one model: the lowest cost per pass, unless another harness costs at most 30% more per pass and passes at least 5 points more often. This rule picked ZCode over OpenCode v1 with DeepSeek (25% more cost, 7.7 more points) and Alma over Oh My Pi with Kimi-K3 (9% more cost, 6.5 more points).</p>
+<hr>
+<h2 id="why-we-built-frontierharness-eval-v11">Why We Built <em>FrontierHarness</em> Eval v1.1</h2>
+<p><a href="/blog/introducing-frontierharness-eval/">V1.0</a> ran nine harnesses with one model. Their pass rates were within 17 points of each other, but the median cost per pass differed by 17 times. We thought that this came mostly from the pair of harness and model: a harness that is cheap with one model can be expensive with another.</p>
+<p>V1.1 runs each harness with five models.</p>
+<hr>
+<h2 id="what-we-tested">What We Tested</h2>
+<p><strong>Harnesses.</strong> 18 harnesses. The four DeepSeek Harness profiles have different tool sets, and OpenCode ran at two versions. Each counts separately: 22 configurations. Table 2 in the <a href="#appendix-reference-tables">appendix</a> gives their versions.</p>
+<p><strong>Models.</strong> Baseten served all five: GLM-5.3 (<code>zai-org/GLM-5.3</code>), GLM Flash (<code>zai-org/GLM-5.3-Flash</code>), DeepSeek (<code>deepseek-ai/DeepSeek-V4.1-Flash-1017</code>), Muse (<code>meta-models/muse-spark-open</code>) and Kimi-K3 (<code>moonshotai/Kimi-K3</code>).</p>
+<p><strong>Tasks.</strong> 62 terminal tasks. The time limits are those of the tasks, from 15 minutes to 8 hours.</p>
+<hr>
+<h2 id="setup-and-scoring">Setup and Scoring</h2>
+<h3 id="configuration-and-runtime">Configuration and Runtime</h3>
+<p>We ran the Harbor evaluation with each harnessâs default settings, because we think this is closest to how people use a harness every day. Each harness used the same version and settings with all models, at the maximum reasoning effort.</p>
+<p><strong>Figure 2. How Harbor and Runta divide the work in each trial</strong></p>
+<picture>
+<source media="(max-width: 639px)" srcset="/blog/introducing-frontierharness-eval-v1-1/harbor-runta-trial-lifecycle-stacked.png" width="1280" height="3832">
+<img src="/blog/introducing-frontierharness-eval-v1-1/harbor-runta-trial-lifecycle.png" alt="Harbor runs each trial, with its agent and verifier, in its own Runta runtime, which is deleted at the end." width="2048" height="1280" loading="lazy">
+</picture>
+<p>Each trial gets a new Runta runtime, which is deleted at the end. Thus no trial can see the files of an earlier trial.</p>
+<h3 id="scoring-method">Scoring Method</h3>
+<p><strong>Table 1. Methodology</strong></p>
+<div data-harness-figure="method">
+<noscript><p><em>This figure is interactive and needs JavaScript.</em></p></noscript>
+</div>
+<p>A cell is one harness and model pair. We use the two cost metrics of <a href="https://frontierharness.org/">our dashboard</a>:</p>
+<ul>
+<li><strong>Average cost per task:</strong> the mean cost of the priced trials of each task, then the mean over the tasks. Figure 1 and the cost ranks use it (Figures 4 and 5).</li>
+<li><strong>Cost per pass:</strong> the average cost per task divided by the pass rate. The best-value harness uses it (Figures 3, 6 and 7).</li>
+</ul>
+<p>We pick the best value by cost per pass because we want harnesses at the top left of a chart of pass rate against cost per task: a high pass rate at a low cost. Draw a line from the origin to the point of a harness. Its slope, pass rate Ã· cost, is the passes per dollar. Cost per pass is the inverse of this slope, so the lowest cost per pass has the steepest line.</p>
+<p>Audits of the trial logs flagged 216 trials for reward hacking, and 163 of them were online lookups. These trials score 0. Table 3 in the appendix gives the count for each harness and model.</p>
+<hr>
+<h2 id="results-by-model">Results by Model</h2>
+<p><strong>Figure 3. Cost and pass rate of each harness with each model</strong></p>
+<div data-harness-figure="matrix" data-metric="costPerPass">
+<noscript><p><em>This figure is interactive and needs JavaScript.</em></p></noscript>
+</div>
+<p>A deeper cell costs less than the others in its column. Codex CLI was the cheapest per pass with GLM-5.3, $0.803, but 12th with Muse and 10th with Kimi-K3. Over all models, it cost the least per pass, $0.937, and Antigravity CLI the most, $1.63.</p>
+<h3 id="how-sure-are-these-results">How Sure Are These Results?</h3>
+<p>We drew the 62 tasks again 4,000 times and chose the best-value harness each time. Codex CLI stayed first with GLM-5.3 in 99.6% of the draws. The other four winners are the most likely of several close harnesses: Oh My Pi with Muse (53%), ZCode with DeepSeek (47%), Pi with GLM Flash (42%) and Alma with Kimi-K3 (25%).</p>
+<hr>
+<h2 id="the-harness-changes-the-cost">The Harness Changes the Cost</h2>
+<p>The model sets the general level of the cost, because the list prices of the models differ by 20 times or more (Figure 9). We took the average cost per task of the 110 cells on a log scale, so that a doubling counts the same with each model. A two-way analysis of variance divides the spread of these costs into three parts:</p>
+<ul>
+<li><strong>Model, 92.8%:</strong> the differences between the five models.</li>
+<li><strong>Harness, 2.3%:</strong> the part of the effect of a harness that is the same with every model.</li>
+<li><strong>Pair, 4.9%:</strong> the rest. It also contains noise, because each cell has one value.</li>
+</ul>
+<p>So with the model fixed, 68% of the variation between harnesses (4.9 of 7.2 points) depends on the pair, or is noise.</p>
+<h3 id="with-the-model-fixed-the-harness-changes-the-cost-by-18-to-50-times">With the Model Fixed, the Harness Changes the Cost by 1.8 to 5.0 Times</h3>
+<p><strong>Figure 4. Lowest-cost and highest-cost harness for each model</strong></p>
+<p>Each row is a model, on a log scale of average cost per task. The ratio divides the highest cost by the lowest.</p>
+<div data-harness-figure="range-task">
+<noscript><p><em>This figure is interactive and needs JavaScript.</em></p></noscript>
+</div>
+<p>To test for chance, we shuffled the trials between the harnesses of each model 300 times and calculated the ratio again. âChanceâ is the median of these ratios, 1.2 to 1.8 times. All five real ratios are larger than every shuffle (p = 0.003), so the spread comes from the harnesses, not from the noise of reruns. The largest is with DeepSeek: Cline CLI cost 5.0 times as much as OpenCode v1, for 2.0 more points. With the other models, the cheapest harness per task was at most 0.4 points behind the most expensive one.</p>
+<h3 id="the-cheapest-harness-per-task-changes-with-the-model">The Cheapest Harness per Task Changes With the Model</h3>
+<p><strong>Figure 5. Cost rank of each harness with each model (1 = lowest cost per task)</strong></p>
+<p>Each line is a harness, with the cheapest at the top. The five highlighted lines are the cheapest harnesses per task with GLM-5.3, GLM Flash, DeepSeek, Muse and Kimi-K3.</p>
+<div data-harness-figure="ranks">
+<noscript><p><em>This figure is interactive and needs JavaScript.</em></p></noscript>
+</div>
+<p>Codex CLI was 1st with GLM-5.3 and 16th with Kimi-K3. DeepSeek Harness: Creator moved the most, from 1st with Muse to 21st with GLM Flash. OpenCode v1 was 1st with DeepSeek and 13th with Muse.</p>
+<p>Reruns do not explain these moves. We divided the attempts into two halves and ranked the harnesses by cost in each half. With the same model, the two rankings had a mean rank correlation of 0.71. With two different models, it was 0.26.</p>
+<h3 id="a-higher-cost-does-not-give-a-higher-score">A Higher Cost Does Not Give a Higher Score</h3>
+<p><strong>Figure 6. Lowest and highest cost per pass for each model</strong></p>
+<p>This is Figure 4 for cost per pass. After each ratio is the rank correlation of the cost per task and the pass rate of the harnesses, from â0.39 to +0.22. A positive value means that the more expensive harnesses passed more often.</p>
+<div data-harness-figure="range-pass">
+<noscript><p><em>This figure is interactive and needs JavaScript.</em></p></noscript>
+</div>
+<p>The harness with the highest pass rate was 5th to 20th of 22 in cost per task. With four of the five models, the most expensive harness per pass passed less often than the cheapest one.</p>
+<hr>
+<h2 id="does-a-simpler-harness-cost-less">Does a Simpler Harness Cost Less?</h2>
+<p>No. We compared four factors with the cost per pass. <strong>Prompt size, tool count and cache hit rate are not the main cost factors. Steps are.</strong></p>
+<ul>
+<li><strong>Start tokens:</strong> the input tokens of the first agent-loop request: the system prompt, the tool definitions and the task.</li>
+<li><strong>Tools:</strong> the tools that the first request offers.</li>
+<li><strong>Cache hit rate and steps:</strong> the mean over the passed trials. A step is one entry of the agent trajectory.</li>
+</ul>
+<p><strong>Figure 7. Four factors of each harness and the cost per pass</strong></p>
+<div data-harness-figure="drivers">
+<noscript><p><em>This figure is interactive and needs JavaScript.</em></p></noscript>
+</div>
+<p>Over the 22 harnesses, the rank correlation of the steps per pass and the cost per pass was +0.51 (p = 0.015). For the other three factors, it was â0.03 to +0.02 (p â¥ 0.88). Within each model, tool calls tracked cost as well as steps. Table 4 below and Table 5 in the <a href="#appendix-reference-tables">appendix</a> give the values.</p>
+<p>Each step sends the context again, so a trial used 2.0 to 4.8 million input tokens on average, by harness, and the largest first request, 21,365 tokens, is less than 1% of that. mini-SWE-agent has the smallest first request, 882 tokens, but took 38 steps per pass and was 17th of 22 in cost per pass.</p>
+<p><strong>Table 4. Start tokens, tools, cache hit rate, steps and cost per pass of each harness</strong></p>
+<div data-harness-figure="sizes">
+<noscript><p><em>This figure is interactive and needs JavaScript.</em></p></noscript>
+</div>
+<hr>
+<h2 id="where-the-cost-comes-from">Where the Cost Comes From</h2>
+<p><strong>Figure 8. Inference cost of each harness, by token type or by trial outcome</strong></p>
+<div data-harness-figure="cost">
+<noscript><p><em>This figure is interactive and needs JavaScript.</em></p></noscript>
+</div>
+<p><em>All costs are inference estimates at list prices. The pass rate of the harness on the model card has an outline.</em></p>
+<p>Over all trials, input from the cache was 42% of the cost, output 33% and other input 25%.</p>
+<h3 id="tokens-and-the-cache">Tokens and the Cache</h3>
+<p>The cache makes repeated input much cheaper. Cached input costs 2% (DeepSeek) to 20% (GLM Flash) of the price of other input (Figure 9).</p>
+<p><strong>Figure 9. List prices of each model (USD for one million tokens)</strong></p>
+<div data-harness-figure="prices">
+<noscript><p><em>This figure is interactive and needs JavaScript.</em></p></noscript>
+</div>
+<p>One pair shows the effect of the cache. <strong>Cline CLI with DeepSeek (highest cost per task)</strong> read 86% of its input from the cache, and OpenCode v1 read 97%. It also sent twice as much input. Input that did not come from the cache was 57% of its cost.</p>
+<h3 id="most-of-the-cost-goes-to-trials-that-do-not-pass">Most of the Cost Goes to Trials That Do Not Pass</h3>
+<p><strong>64.5% of the list-price cost of the scored runs went to trials that did not pass</strong>: 52.7% to failures and 11.8% to timeouts.</p>
+<hr>
+<h2 id="what-the-best-value-harnesses-share">What the Best-Value Harnesses Share</h2>
+<p>The traces of the five best-value harnesses show three common design choices. These are observations, not tests.</p>
+<p><strong>One shell tool does most of the work.</strong> By harness, it got 61% to 93% of the tool calls. Piâs <a href="https://github.com/earendil-works/pi/blob/v1.4.0/packages/coding-agent/src/core/system-prompt.ts#L64-L114">default prompt</a> has four tools and sends file searches to <code>bash</code>:</p>
+<pre><code class="language-ts">selectedTools: [...(input.selectedTools ?? ["read", "bash", "edit", "write"])],
+addRule("Use bash for file operations like ls, rg, find");
+</code></pre>
+<p><strong>Each request only adds to the one before it.</strong> The start of the context does not change, so the provider reads it from the cache: 91.1% to 94.0% of input in passed trials (Table 4). But 18 of the 22 harnesses read 91% or more, so this does not separate the five. Each step pays the full input price for only about 500 new tokens:</p>
+<pre><code class="language-text"># Pi, GLM-5.3, merge-diff-arc-agi-task (trial cd2f6dfd)
+request  prompt tokens  cached tokens
+   8        15,954         15,616
+   9        16,351         15,936
+  10        16,999         16,320
+</code></pre>
+<p><strong>No subagents and almost no summaries.</strong> Each of the five used a subagent in at most 6 trials, too few to tell if subagents help. Of the five, only Codex CLI summarized, in 8 trials (the 11 Alma trials in Table 6 only drop old images and reminders). Codex CLI summarizes at 90% of the window (Table 6):</p>
+<pre><code class="language-rust">.map(|context_window| (context_window * 9) / 10);
+</code></pre>
+<p>The five also share a weakness. <strong>Failed runs end with a confident answer.</strong> About three in four failed trials ended with a final answer, not at the time limit: from 68% with Pi to 82% with Codex CLI. Few said that the work was incomplete:</p>
+<pre><code class="language-text"># Codex CLI, GLM-5.3, cancel-async-tasks (trial 37182b0e)
+Agent:    - Validated with system Python, including concurrency and
+            cancellation-cleanup tests.
+Verifier: FAILED test_tasks_cancel_above_max_concurrent
+          assert stdout.count("Cleaned up.") == 2
+          AssertionError: assert 0 == 2
+</code></pre>
+<p>Trials that did not pass took 60% (Codex CLI) to 69% (Alma) of the cost of each harness. A check before the harness stops could save part of it, but we did not test this.</p>
+<hr>
+<h2 id="limitations-and-future-work">Limitations and Future Work</h2>
+<ul>
+<li><strong>Open models, one provider.</strong> Closed models can give different results. The cache and the prices are those of Baseten, and another provider can change the cost ranks.</li>
+</ul>
+<p>We plan two next steps:</p>
+<ul>
+<li><strong>Closed models.</strong> We will add closed models, such as Claude Opus 5.5, GPT-6 Astra and Gemini 4 Carbon.</li>
+<li><strong>Long-horizon work.</strong> We will study how a harness that runs continuously in the cloud improves itself during long work.</li>
+</ul>
+<hr>
+<h2 id="conclusion">Conclusion</h2>
+<ul>
+<li><strong>When you change the model, think about changing the harness too.</strong> Test the candidate harnesses with your model on a private dataset of your own tasks, large enough to see past the noise.</li>
+<li><strong>The model sets most of the cost, and the harness is second.</strong> The model explains 92.8% of the variance of cost per task. With the model fixed, the most expensive harness cost 1.9 to 4.9 times as much per pass as the cheapest (1.8 to 5.0 times per task), so compare the cost when you pick a harness.</li>
+<li><strong>A higher cost does not buy a higher pass rate.</strong> For each model, the rank correlation of cost per task and pass rate was â0.39 to +0.22.</li>
+<li><strong>Size does not predict cost.</strong> mini-SWE-agent, the smallest harness, was 19th of 22 by cost per task over all models.</li>
+<li><strong>Most of the cost, 64.5%, went to runs that did not pass.</strong> With the five best-value harnesses, 68% to 82% of the failed runs ended with a confident final answer, not at the time limit.</li>
+<li><strong>With a cheap model that has a wide range of pass rates, pick a harness with a high pass rate.</strong> Pass rates varied by harness, from 54.0% to 69.0% with DeepSeek. But each pass rate has a 95% interval of about Â±10 points, so a gap of a few points is a tie.</li>
+<li><strong>For harness developers: cut steps, not just prompt tokens.</strong> Prompt size, tool count and cache hit rate did not predict cost per pass. Steps did, because every step sends the whole context again.</li>
+</ul>
+<hr>
+<h2 id="appendix-reference-tables">Appendix: Reference Tables</h2>
+<p><strong>Table 2. Harness configurations</strong></p>
+<div data-harness-figure="configs">
+<noscript><p><em>This figure is interactive and needs JavaScript.</em></p></noscript>
+</div>
+<p><strong>Table 3. Reward-hacked trials of each harness</strong></p>
+<div data-harness-figure="hacks">
+<noscript><p><em>This figure is interactive and needs JavaScript.</em></p></noscript>
+</div>
+<p><strong>Table 5. Prompt and tools of each harness</strong></p>
+<div data-harness-figure="design">
+<noscript><p><em>This figure is interactive and needs JavaScript.</em></p></noscript>
+</div>
+<hr>
+<h2 id="references">References</h2>
+<ul>
+<li><a href="https://frontierharness.org/">FrontierHarness dashboard</a></li>
+<li><a href="https://github.com/harbor-framework/harbor">Harbor</a> and <a href="https://hub.harborframework.com/">Harbor Hub</a>, where the ten jobs are stored</li>
+<li><a href="/blog/introducing-frontierharness-eval/">Introducing FrontierHarness Eval</a>, our v1.0 results</li>
+<li><a href="https://www.baseten.co/">Baseten</a>, <a href="https://www.baseten.co/products/model-apis/">Model APIs</a>, the inference provider for performant open models</li>
+<li><a href="https://runta.com/docs/integrations/harbor/">Runta Harbor guide</a> and <a href="https://runta.com/pricing/">Runta pricing</a></li>
+</ul></div></article><script type="module" src="/_astro/_...slug_.astro_astro_type_script_index_0_lang.vr_NPHaM.js"></script></div></main><footer class="site-footer"><div class="container"><div class="site-footer-intro"><div class="site-footer-brand"><img src="/img/runta-logo.png" alt="Runta" class="site-footer-brand-img"><span>Runta</span></div><p class="site-footer-description">Agent execution layer for token efficiency, secret protection, and governed access.</p><a class="site-footer-badge" href="https://trust.runta.com/" target="_blank" rel="noopener noreferrer" aria-label="SOC 2 Type II &amp; ISO 27001 â in progress. View Trust Center (opens in a new tab)"><span class="site-footer-badge-tooltip" aria-hidden="true">SOC 2 Type II &amp; ISO 27001 â in progress. View Trust Center</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg><span>SOC 2 Â· ISO 27001</span></a><p class="site-footer-copy">Â© 2026 Runta</p></div><div class="site-footer-groups"><div class="site-footer-group"><div class="site-footer-title">Resources</div><nav class="site-footer-links"><a href="/docs/">Docs</a><a href="/blog/">Blog</a></nav></div><div class="site-footer-group"><div class="site-footer-title">About</div><nav class="site-footer-links"><a href="/about/">Company</a><a href="/careers/">Careers</a><a href="https://trust.runta.com/" target="_blank" rel="noopener noreferrer">Trust Center</a><a href="/privacy-policy/">Privacy policy</a><a href="/terms-of-use/">Terms of service</a></nav></div><div class="site-footer-group"><div class="site-footer-title">Social</div><nav class="site-footer-links"><a href="https://discord.gg/62d4bkaTnS" target="_blank" rel="noopener noreferrer">Discord</a><a href="https://github.com/runta-dev" target="_blank" rel="noopener noreferrer">GitHub</a><a href="https://x.com/runta" target="_blank" rel="noopener noreferrer">X</a><a href="https://www.linkedin.com/company/runta-inc/" target="_blank" rel="noopener noreferrer">LinkedIn</a><a href="mailto:support@runta.com">Contact us</a></nav></div></div></div></footer></div></body></html>
