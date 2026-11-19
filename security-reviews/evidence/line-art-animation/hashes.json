@@ -31,5 +31,6 @@
   "files/scripts/clip.ts": "cac4ac98516cdcb06e2e65323dda19ec01121ef734c1064fa8bf496aa124f1f1",
   "files/scripts/frames.sh": "9d1f7099121fe048c06de4f64900e103c9dfb6e99109725df7c5484e1881e26e",
   "files/tsconfig.json": "6def3178af590e57f4484f1b67691eb6684e615539cff8429809e25ea7ccf128",
-  "files/vite.config.ts": "90c365029947bcb64267bec822f274faac43417eadc0c5a4dfa96e74937ab9cc"
+  "files/vite.config.ts": "90c365029947bcb64267bec822f274faac43417eadc0c5a4dfa96e74937ab9cc",
+  "hashes-source.json": "21a259152130ddbe840d9cc2eca75308cac0715417b8240193ce0cd8daae358e"
 }

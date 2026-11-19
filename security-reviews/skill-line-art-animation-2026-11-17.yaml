@@ -18,7 +18,7 @@ reviewer:
     scripts NOT executed; plugin NOT installed.
 conclusion: approve
 binds_to:
-  package_integrity_sha256: 4c8b083b71e9ae07d3ffd3bcc87c1ea8e2049a0f0f123a4ee8aa4d3762a1b8f9
+  package_integrity_sha256: 2d10a9191b09fcdaa0dcaa3606afe4f43995924d49640ef0f9d4bb38e9a96828
   git_commit: c43d698913cf0ad44f984c7ae14c5348010594d3
   file_count: 37
   skill_md_count: 1
@@ -26,10 +26,14 @@ binds_to:
     repo convention (security_admission.package_integrity_from_hashes): sha256 of
     newline-joined '<path>=<sha256>' lines over the evidence manifest
     (hashes.json), paths sorted. Evidence holds every UTF-8 text file of the
-    package at the pinned commit (33 files); 4 binary asset(s) are bound by
-    git_commit + the full capture manifest kept in hashes-source.json.
-    Migrated 2026-11-17 from the capture-time sha256sum-style rollup; every
-    per-file sha256 is unchanged and was re-verified against the pinned commit.
+    package at the pinned commit (33 files) plus hashes-source.json itself.
+    The 4 binary asset(s) are indirectly pinned because hashes-source.json
+    (the full capture manifest including binary digests) is an entry in
+    hashes.json and therefore covered by package_integrity_sha256; git_commit
+    remains the upstream pin. Migrated 2026-11-17 from the capture-time
+    sha256sum-style rollup; every per-file sha256 is unchanged and was
+    re-verified against the pinned commit. hashes-source.json was added to
+    hashes.json on 2026-11-19 so binaries are rollup-protected.
 scope:
   method: static-clone-hash-and-read
   covered:
@@ -163,7 +167,7 @@ findings:
       carrying npm registry sha512 integrity hashes; no install/postinstall
       scripts.
 unverified:
-  - Runtime behavior of the SessionStart hook and scripts (static only; not executed)
+  - Runtime behavior of scripts (static only; not executed) — this package has no SessionStart hook
   - npm dependencies were not installed or audited beyond the lockfile integrity hashes
   - Media binaries (media/*.png, media/*.gif) were only file-typed, not pixel-inspected
   - GitHub account history and reputation of JDhruv14 beyond this single-commit repo were not checked

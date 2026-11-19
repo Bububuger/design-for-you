@@ -45,5 +45,6 @@
   "files/skills/cinematic-film/scripts/render.py": "f3660055ceeca059d447e70421bb9ce89c296ad60a91eb0af13421b3721ef507",
   "files/skills/cinematic-film/scripts/split_takes.py": "9e90dd94d6b125cb6bd5951533beb3d1feae6dadce662165f2277986aaabe8d1",
   "files/skills/cinematic-film/scripts/tts_say.py": "492cb0e1391299d2a99e7a179e399a06b3b7dc23f4c657b13b6700c43c9eb19c",
-  "files/tests/check.mjs": "f2ba9afb0ffe00525e9b258c0f82519102b0d893314ab4e80d044ce2d012cd7e"
+  "files/tests/check.mjs": "f2ba9afb0ffe00525e9b258c0f82519102b0d893314ab4e80d044ce2d012cd7e",
+  "hashes-source.json": "7dd2ecd493564ea8c0c0b3db5a9f175e17bf776e4e505ef30922237dbb413afc"
 }

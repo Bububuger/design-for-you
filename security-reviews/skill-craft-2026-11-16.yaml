@@ -18,7 +18,7 @@ reviewer:
     inspection; hooks and scripts NOT executed; plugin NOT installed.
 conclusion: approve
 binds_to:
-  package_integrity_sha256: f8632ad66cd738c6923185e48c5edb5fb36181d81666976f5e3c6f9307f36a5a
+  package_integrity_sha256: 8c872484a47b83493b8ca0c18fdfed31882e48a7d5ac318e1b2ec801aa2c8e88
   git_commit: 49fb28c3bf9a29da6b2fc5050cf31ceefed28779
   file_count: 86
   skill_md_count: 8
@@ -26,10 +26,14 @@ binds_to:
     repo convention (security_admission.package_integrity_from_hashes): sha256 of
     newline-joined '<path>=<sha256>' lines over the evidence manifest
     (hashes.json), paths sorted. Evidence holds every UTF-8 text file of the
-    package at the pinned commit (84 files); 2 binary asset(s) are bound by
-    git_commit + the full capture manifest kept in hashes-source.json.
-    Migrated 2026-11-17 from the capture-time sha256sum-style rollup; every
-    per-file sha256 is unchanged and was re-verified against the pinned commit.
+    package at the pinned commit (84 files) plus hashes-source.json itself.
+    The 2 binary asset(s) are indirectly pinned because hashes-source.json
+    (the full capture manifest including binary digests) is an entry in
+    hashes.json and therefore covered by package_integrity_sha256; git_commit
+    remains the upstream pin. Migrated 2026-11-17 from the capture-time
+    sha256sum-style rollup; every per-file sha256 is unchanged and was
+    re-verified against the pinned commit. hashes-source.json was added to
+    hashes.json on 2026-11-19 so binaries are rollup-protected.
 scope:
   method: static-clone-hash-and-read
   covered:
@@ -132,8 +136,10 @@ scope:
   integrity_note: >-
     Approval binds to git_commit + package_integrity_sha256 of the committed
     evidence manifest. The upstream repo is mutable; any new commit requires
-    re-review. Evidence vendors hashes for all 86 files plus the
-    security-relevant source files (SKILL.md x8, hooks, scripts, manifests).
+    re-review. Evidence vendors every UTF-8 text file from the pinned commit
+    (84 files under files/) plus hashes-source.json (full capture manifest
+    including the 2 binary digests), so the rollup covers text evidence and
+    indirectly pins the binaries.
 findings:
   - id: F1
     severity: note

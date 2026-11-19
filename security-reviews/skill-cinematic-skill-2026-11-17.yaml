@@ -18,7 +18,7 @@ reviewer:
     scripts NOT executed; plugin NOT installed.
 conclusion: approve
 binds_to:
-  package_integrity_sha256: 61a438969542bec724c024040966079e9d86bf41686bcc054c14704460ee3e87
+  package_integrity_sha256: 617155a93948d5deeb9f35916be9038c1ed69fada788977f26cf68ffa24caca9
   git_commit: bf435561c6203f90f971300efe952b68b5ec3417
   file_count: 50
   skill_md_count: 1
@@ -26,10 +26,14 @@ binds_to:
     repo convention (security_admission.package_integrity_from_hashes): sha256 of
     newline-joined '<path>=<sha256>' lines over the evidence manifest
     (hashes.json), paths sorted. Evidence holds every UTF-8 text file of the
-    package at the pinned commit (47 files); 3 binary asset(s) are bound by
-    git_commit + the full capture manifest kept in hashes-source.json.
-    Migrated 2026-11-17 from the capture-time sha256sum-style rollup; every
-    per-file sha256 is unchanged and was re-verified against the pinned commit.
+    package at the pinned commit (47 files) plus hashes-source.json itself.
+    The 3 binary asset(s) are indirectly pinned because hashes-source.json
+    (the full capture manifest including binary digests) is an entry in
+    hashes.json and therefore covered by package_integrity_sha256; git_commit
+    remains the upstream pin. Migrated 2026-11-17 from the capture-time
+    sha256sum-style rollup; every per-file sha256 is unchanged and was
+    re-verified against the pinned commit. hashes-source.json was added to
+    hashes.json on 2026-11-19 so binaries are rollup-protected.
 scope:
   method: static-clone-hash-and-read
   covered:
@@ -211,5 +215,13 @@ notes: >-
   Fed from the Skill HOT routine (2026-11-17) as a design skill candidate for
   the skill track. Serious unresolved malicious findings were not established
   under static review. Residual risks (--cmd shell=True by design, render.py
-  executes project scene.py, curl|bash installer unpinned, font downloads
-  unverified) are documented; actual agent verification remains not_tested.
+  executes project scene.py, curl|bash installer unpinned to main, font
+  downloads unverified, new/pseudonymous author account) are documented;
+  actual agent verification remains not_tested.
+usage_restrictions:
+  - Do not auto-run install.sh or any curl|bash installer; install only after
+    human confirmation of the exact pinned commit in an isolated environment.
+  - Do not auto-run project scripts (tts_say.py --cmd, render.py / scene.py,
+    or other scripts under skills/cinematic-film/scripts/); execute only after
+    human review of the specific project and command in isolation.
+  - Treat scene.py and --cmd strings as executable untrusted code.

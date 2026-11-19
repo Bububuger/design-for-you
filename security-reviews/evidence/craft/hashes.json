@@ -82,5 +82,6 @@
   "files/tests/scenarios/craft/baseline.md": "d00d586b8f5c28c4b7ab78a1acb5656644cd9d23e329b525691dbc45db9ade7c",
   "files/tests/scenarios/craft/green.md": "ac3428e364c86dc765d5e0270243aae720c304a68ec5111620cb7374af2d4deb",
   "files/tests/scenarios/using-craft/baseline.md": "aea6be55a1df4a9199956a7c6aa02699108a731036a37430417f67c955a7e145",
-  "files/tests/scenarios/workflow/runs.md": "1aa04aff5988cea0fb92ed4b52fb0c0d706a26027ee0431dd58c47e7b2b38dd6"
+  "files/tests/scenarios/workflow/runs.md": "1aa04aff5988cea0fb92ed4b52fb0c0d706a26027ee0431dd58c47e7b2b38dd6",
+  "hashes-source.json": "80368476f8da0c8a62839854ced21fdd4e8dda1647e8e950fd6a033706f806fc"
 }

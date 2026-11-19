@@ -12,5 +12,6 @@
   "files/skills/dimensional-drawing-motion/templates/scene-dialog.js": "bfdea8e98e4b38c22fc334ea7e68ddacd10588d01edc142ae953cf7950d256c9",
   "files/skills/dimensional-drawing/SKILL.md": "b4fce1c4556d22734a13f949da9d914df0436d5f2170191f6ec78a879d0ac5ba",
   "files/skills/dimensional-drawing/examples/card-sheet.html": "197b7ef3b9deb7e7698c8bbb88812ec446536bcadc4b8d2e07084ac222776fab",
-  "files/skills/dimensional-drawing/examples/dialog-sheet.html": "6a407cf4f827c4e1996c09eceedc592c8952a4b5a48d0ecef63440a334308ff2"
+  "files/skills/dimensional-drawing/examples/dialog-sheet.html": "6a407cf4f827c4e1996c09eceedc592c8952a4b5a48d0ecef63440a334308ff2",
+  "hashes-source.json": "75756204d22625b43156798263ee3f4adbe79d4cf02cb8380b01e28c873bc3c0"
 }

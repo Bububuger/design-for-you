@@ -18,7 +18,7 @@ reviewer:
     scripts NOT executed; plugin NOT installed.
 conclusion: approve
 binds_to:
-  package_integrity_sha256: eda9d8615300c182d1d0c4264955d319551098b80700270edda675c75dca3e4d
+  package_integrity_sha256: c3422c988405cce33f0e061723b8ad50f7a847faf69747ad6768ac6737fcab29
   git_commit: 5c457437c8c83524308aad3b7443e81adcc13153
   file_count: 18
   skill_md_count: 2
@@ -26,10 +26,14 @@ binds_to:
     repo convention (security_admission.package_integrity_from_hashes): sha256 of
     newline-joined '<path>=<sha256>' lines over the evidence manifest
     (hashes.json), paths sorted. Evidence holds every UTF-8 text file of the
-    package at the pinned commit (14 files); 4 binary asset(s) are bound by
-    git_commit + the full capture manifest kept in hashes-source.json.
-    Migrated 2026-11-17 from the capture-time sha256sum-style rollup; every
-    per-file sha256 is unchanged and was re-verified against the pinned commit.
+    package at the pinned commit (14 files) plus hashes-source.json itself.
+    The 4 binary asset(s) are indirectly pinned because hashes-source.json
+    (the full capture manifest including binary digests) is an entry in
+    hashes.json and therefore covered by package_integrity_sha256; git_commit
+    remains the upstream pin. Migrated 2026-11-17 from the capture-time
+    sha256sum-style rollup; every per-file sha256 is unchanged and was
+    re-verified against the pinned commit. hashes-source.json was added to
+    hashes.json on 2026-11-19 so binaries are rollup-protected.
 scope:
   method: static-clone-hash-and-read
   covered:

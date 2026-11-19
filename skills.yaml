@@ -1,3 +1,6 @@
+# Design skill resources (first-class track). Metadata + locators only.
+# No invented seat quota. actual_test_status stays not_tested until real verification.
+# Sources remain untrusted data even after security admission approve.
 - id: ui-taste
   name: UI Taste by Uizze
   status: candidate
@@ -8,7 +11,7 @@
     index_url: https://uizze.sh/.well-known/agent-skills/index.json
     skill_md_url: https://uizze.sh/.well-known/agent-skills/ui-taste/SKILL.md
   version_labels:
-    skill_frontmatter: 0.3.0
+    skill_frontmatter: "0.3.0"
     manifest: uizze-design-v14
   content_integrity:
     algorithm: sha256
@@ -17,152 +20,316 @@
     file_hashes_path: security-reviews/evidence/ui-taste/hashes.json
     skill_md_sha256: d1d73a4370a444af09869d55374be27c15a67d232b3d05ff11202508909e7c00
   license: Apache-2.0
-  license_notes: See package LICENSE plus NOTICE (impeccable Apache-2.0 adaptations;
+  license_notes: >-
+    See package LICENSE plus NOTICE (impeccable Apache-2.0 adaptations;
     Appllama MIT; ehmo platform-design-skills MIT).
   capabilities:
-  - ui-design
-  - design-review
-  - anti-slop
-  - frontend
-  - ios-ui
+    - ui-design
+    - design-review
+    - anti-slop
+    - frontend
+    - ios-ui
   dependencies: []
   optional_mcp:
-  - name: uizze
-    paid: true
-    notes: Optional paid MCP for real-product references/materials. Free skill path
-      claims no account required. Admission does not activate or authorize MCP.
-  risk_notes: Untrusted third-party skill data. Optional paid MCP and mutable host
-    content are residual risks. Do not execute package scripts during pool operations.
+    - name: uizze
+      paid: true
+      notes: >-
+        Optional paid MCP for real-product references/materials. Free skill path
+        claims no account required. Admission does not activate or authorize MCP.
+  risk_notes: >-
+    Untrusted third-party skill data. Optional paid MCP and mutable host content
+    are residual risks. Do not execute package scripts during pool operations.
     See security-reviews/skill-ui-taste-2026-11-09.yaml.
   actual_test_status: not_tested
   security_review_id: skill-ui-taste-2026-11-09
   security_admission: reviewed-approve-bound
   covers:
-  - ui-taste
-  - anti-slop
-  - design-review
-  - visual-hierarchy
-  search_hint: 'track: skill — Uizze ui-taste design playbooks (metadata locator only;
-    install/run out of band after operator judgment).'
+    - ui-taste
+    - anti-slop
+    - design-review
+    - visual-hierarchy
+  search_hint: >-
+    track: skill — Uizze ui-taste design playbooks (metadata locator only;
+    install/run out of band after operator judgment).
   auth: none
-  added_at: '2026-11-09'
+  added_at: "2026-11-09"
 - id: craft
   name: craft
   status: candidate
   kind: design-skill
   source:
     install_locator: https://github.com/diego3g/craft/
+    git_commit: 49fb28c3bf9a29da6b2fc5050cf31ceefed28779
   url: https://github.com/diego3g/craft/
   aliases: []
-  covers:
-  - design-skill
-  search_hint: 'track: skill — diego3g/craft design skill suite (metadata locator
-    only; install/run out of band after operator judgment).'
-  auth: none
-  actual_test_status: not_tested
-  added_at: '2026-11-17'
+  version_labels:
+    git_commit: 49fb28c3bf9a29da6b2fc5050cf31ceefed28779
   content_integrity:
     algorithm: sha256
-    package_integrity: f8632ad66cd738c6923185e48c5edb5fb36181d81666976f5e3c6f9307f36a5a
+    package_integrity: 8c872484a47b83493b8ca0c18fdfed31882e48a7d5ac318e1b2ec801aa2c8e88
+    file_count: 85
+    file_hashes_path: security-reviews/evidence/craft/hashes.json
+  license: MIT
+  license_notes: >-
+    Upstream LICENSE is MIT (Copyright (c) 2026 Diego Fernandes). Hook files
+    attribute obra/superpowers (MIT).
+  capabilities:
+    - design-workflow
+    - design-critique
+    - design-system
+    - state-coverage
+    - exploration
+  dependencies: []
+  risk_notes: >-
+    Untrusted third-party skill data. SessionStart hook installs and runs on
+    agent start (reads only using-craft/SKILL.md; injects emphatic routing
+    language). Do not execute hooks/scripts during pool operations. Bind
+    installs to source.git_commit + evidence at file_hashes_path, not floating
+    HEAD. See security-reviews/skill-craft-2026-11-16.yaml.
+  actual_test_status: not_tested
   security_review_id: skill-craft-2026-11-16
   security_admission: reviewed-approve-bound
+  covers:
+    - craft
+    - design-workflow
+    - design-critique
+    - design-system
+    - state-coverage
+  search_hint: >-
+    track: skill — diego3g/craft design skill suite (metadata locator only;
+    install/run out of band after operator judgment).
+  auth: none
+  added_at: "2026-11-17"
 - id: stitch-skills
   name: stitch-skills
   status: candidate
   kind: design-skill
   source:
     install_locator: https://github.com/google-labs-code/stitch-skills/
+    git_commit: 0337446dadde6f8c94210444e2aa9d546126480f
   url: https://github.com/google-labs-code/stitch-skills/
   aliases: []
-  covers:
-  - design-skill
-  search_hint: 'track: skill — google-labs-code/stitch-skills Stitch design skills
-    (metadata locator only; install/run out of band after operator judgment).'
-  auth: none
-  actual_test_status: not_tested
-  added_at: '2026-11-17'
+  version_labels:
+    git_commit: 0337446dadde6f8c94210444e2aa9d546126480f
   content_integrity:
     algorithm: sha256
-    package_integrity: 00d5e0bc612d9dd86c2cad5e44d2ec494800ebc4340224ae104dcf448dc9ef3f
+    package_integrity: 520568cc5b913baa38d6b858de75a1d9a250370ccb66817c07f3ad32859a49e7
+    file_count: 89
+    file_hashes_path: security-reviews/evidence/stitch-skills/hashes.json
+  license: Apache-2.0
+  license_notes: >-
+    Upstream LICENSE is Apache License 2.0 (Copyright Google LLC).
+  capabilities:
+    - stitch
+    - design-generation
+    - taste-design
+    - design-md
+    - code-to-design
+  dependencies: []
+  risk_notes: >-
+    Untrusted third-party skill data. Medium residual credential risk:
+    upload-to-stitch directs the agent to read API keys from local MCP config
+    (~/.claude.json, ~/.gemini/settings.json, mcp_config.json, etc.) and the
+    key may be sent to whatever --api-url / httpUrl is configured, not only
+    Google endpoints. Usage restriction: never let the agent scan local config
+    for keys; supply credentials only via explicit --api-key / environment
+    after confirming the destination URL. Uploads send design/code to Stitch.
+    Bind installs to source.git_commit + evidence at file_hashes_path. See
+    security-reviews/skill-stitch-skills-2026-11-16.yaml.
+  actual_test_status: not_tested
   security_review_id: skill-stitch-skills-2026-11-16
   security_admission: reviewed-approve-bound
+  covers:
+    - stitch
+    - taste-design
+    - design-md
+    - design-generation
+    - code-to-design
+  search_hint: >-
+    track: skill — google-labs-code/stitch-skills Stitch design skills
+    (metadata locator only; install/run out of band after operator judgment).
+  auth: none
+  added_at: "2026-11-17"
 - id: dimensional-drawing
   name: dimensional-drawing
   status: candidate
   kind: design-skill
   source:
     install_locator: https://github.com/enesozturk/dimensional-drawing/
+    git_commit: 5c457437c8c83524308aad3b7443e81adcc13153
   url: https://github.com/enesozturk/dimensional-drawing/
   aliases: []
-  covers:
-  - design-skill
-  search_hint: 'track: skill — enesozturk/dimensional-drawing dimensioned drawing
-    skills (metadata locator only; install/run out of band after operator judgment).'
-  auth: none
-  actual_test_status: not_tested
-  added_at: '2026-11-17'
+  version_labels:
+    git_commit: 5c457437c8c83524308aad3b7443e81adcc13153
   content_integrity:
     algorithm: sha256
-    package_integrity: eda9d8615300c182d1d0c4264955d319551098b80700270edda675c75dca3e4d
+    package_integrity: c3422c988405cce33f0e061723b8ad50f7a847faf69747ad6768ac6737fcab29
+    file_count: 15
+    file_hashes_path: security-reviews/evidence/dimensional-drawing/hashes.json
+  license: MIT
+  license_notes: >-
+    Upstream LICENSE is MIT (Copyright (c) 2026 Enes Ozturk).
+  capabilities:
+    - dimensional-drawing
+    - component-anatomy
+    - redline-specs
+    - motion-drawing
+  dependencies: []
+  risk_notes: >-
+    Untrusted third-party skill data. Optional headless adapter may
+    postinstall-download Chromium via playwright; example/player HTML loads
+    Google Fonts. Do not execute render scripts during pool operations. Bind
+    installs to source.git_commit + evidence at file_hashes_path. See
+    security-reviews/skill-dimensional-drawing-2026-11-17.yaml.
+  actual_test_status: not_tested
   security_review_id: skill-dimensional-drawing-2026-11-17
   security_admission: reviewed-approve-bound
+  covers:
+    - dimensional-drawing
+    - component-anatomy
+    - redline-specs
+    - motion-drawing
+  search_hint: >-
+    track: skill — enesozturk/dimensional-drawing dimensioned drawing skills
+    (metadata locator only; install/run out of band after operator judgment).
+  auth: none
+  added_at: "2026-11-17"
 - id: line-art-animation
   name: line-art-animation
   status: candidate
   kind: design-skill
   source:
     install_locator: https://github.com/JDhruv14/line-art-animation/
+    git_commit: c43d698913cf0ad44f984c7ae14c5348010594d3
   url: https://github.com/JDhruv14/line-art-animation/
   aliases: []
-  covers:
-  - design-skill
-  search_hint: 'track: skill — JDhruv14/line-art-animation line-art animation skill
-    (metadata locator only; install/run out of band after operator judgment).'
-  auth: none
-  actual_test_status: not_tested
-  added_at: '2026-11-17'
+  version_labels:
+    git_commit: c43d698913cf0ad44f984c7ae14c5348010594d3
   content_integrity:
     algorithm: sha256
-    package_integrity: 4c8b083b71e9ae07d3ffd3bcc87c1ea8e2049a0f0f123a4ee8aa4d3762a1b8f9
+    package_integrity: 2d10a9191b09fcdaa0dcaa3606afe4f43995924d49640ef0f9d4bb38e9a96828
+    file_count: 34
+    file_hashes_path: security-reviews/evidence/line-art-animation/hashes.json
+  license: MIT
+  license_notes: >-
+    Upstream LICENSE is MIT (Copyright (c) 2026 JDhruv14).
+  capabilities:
+    - line-art
+    - svg-animation
+    - illustration-motion
+    - capture-verify
+  dependencies: []
+  risk_notes: >-
+    Untrusted third-party skill data. npm devDependencies (vite/typescript);
+    capture.ts launches local Chrome CDP. No SessionStart hook in this
+    package. Do not execute capture/clip scripts during pool operations. Bind
+    installs to source.git_commit + evidence at file_hashes_path. See
+    security-reviews/skill-line-art-animation-2026-11-17.yaml.
+  actual_test_status: not_tested
   security_review_id: skill-line-art-animation-2026-11-17
   security_admission: reviewed-approve-bound
+  covers:
+    - line-art
+    - svg-animation
+    - illustration-motion
+  search_hint: >-
+    track: skill — JDhruv14/line-art-animation line-art animation skill
+    (metadata locator only; install/run out of band after operator judgment).
+  auth: none
+  added_at: "2026-11-17"
 - id: cinematic-skill
   name: cinematic-skill
   status: candidate
   kind: design-skill
   source:
     install_locator: https://github.com/Moh4696/cinematic-skill/
+    git_commit: bf435561c6203f90f971300efe952b68b5ec3417
   url: https://github.com/Moh4696/cinematic-skill/
   aliases: []
-  covers:
-  - design-skill
-  search_hint: 'track: skill — Moh4696/cinematic-skill cinematic film skill (metadata
-    locator only; install/run out of band after operator judgment).'
-  auth: none
-  actual_test_status: not_tested
-  added_at: '2026-11-17'
+  version_labels:
+    git_commit: bf435561c6203f90f971300efe952b68b5ec3417
   content_integrity:
     algorithm: sha256
-    package_integrity: 61a438969542bec724c024040966079e9d86bf41686bcc054c14704460ee3e87
+    package_integrity: 617155a93948d5deeb9f35916be9038c1ed69fada788977f26cf68ffa24caca9
+    file_count: 48
+    file_hashes_path: security-reviews/evidence/cinematic-skill/hashes.json
+  license: MIT
+  license_notes: >-
+    Upstream LICENSE is MIT (Copyright (c) 2026 exploraX). Author is a new
+    pseudonymous GitHub account (Moh4696 / exploraX).
+  capabilities:
+    - cinematic-film
+    - video-production
+    - narration
+    - documentary-style
+  dependencies: []
+  risk_notes: >-
+    Untrusted third-party skill data with a large execution surface: tts_say.py
+    uses shell=True for operator --cmd; render.py exec_module-executes project
+    scene.py; install.sh is curl|bash cloning unpinned main; pip deps
+    (skia-python etc.) + ffmpeg; network fetches (Commons/fonts/jsdelivr);
+    author is a new account. Usage restrictions: never auto-run the installer
+    or project scripts; only execute in an isolated environment after human
+    confirmation of the pinned commit and the specific command/project. Bind
+    installs to source.git_commit + evidence at file_hashes_path. See
+    security-reviews/skill-cinematic-skill-2026-11-17.yaml.
+  actual_test_status: not_tested
   security_review_id: skill-cinematic-skill-2026-11-17
   security_admission: reviewed-approve-bound
+  covers:
+    - cinematic-film
+    - video-production
+    - narration
+  search_hint: >-
+    track: skill — Moh4696/cinematic-skill cinematic film skill (metadata
+    locator only; install/run out of band after operator judgment).
+  auth: none
+  added_at: "2026-11-17"
 - id: material-expressive-skill
   name: material-expressive-skill
   status: candidate
   kind: design-skill
   source:
     install_locator: https://github.com/asimawdah/material-expressive-skill/
+    git_commit: ed134a1966351de013b2652353bbbb20d9d3962a
   url: https://github.com/asimawdah/material-expressive-skill/
   aliases: []
-  covers:
-  - design-skill
-  search_hint: 'track: skill — asimawdah/material-expressive-skill Material 3 Expressive
-    design skill (metadata locator only; install/run out of band after operator judgment).'
-  auth: none
-  actual_test_status: not_tested
-  added_at: '2026-11-17'
+  version_labels:
+    git_commit: ed134a1966351de013b2652353bbbb20d9d3962a
   content_integrity:
     algorithm: sha256
-    package_integrity: 32f08c5d4d7c5eb97cddd34db50b2f0f94b988d813e453a6d4a93b2eb93047f5
+    package_integrity: 76c2c9ecc65168cec2298d3752fe87983e89c7e18b91ec62241de03169b47409
+    file_count: 24
+    file_hashes_path: security-reviews/evidence/material-expressive-skill/hashes.json
+  license: MIT
+  license_notes: >-
+    Upstream LICENSE is MIT (Copyright (c) 2026 Asim Awdah), consistent with
+    SKILL.md frontmatter.
+  capabilities:
+    - material-3
+    - expressive
+    - android-ui
+    - accessibility
+    - design-tokens
+  dependencies: []
+  risk_notes: >-
+    Untrusted third-party skill data. Lowest residual risk among this batch:
+    documentation plus a stdlib-only validator; no hooks/plugins/shell
+    installers in-repo. Do not execute validator scripts during pool
+    operations. Bind installs to source.git_commit + evidence at
+    file_hashes_path. See
+    security-reviews/skill-material-expressive-skill-2026-11-17.yaml.
+  actual_test_status: not_tested
   security_review_id: skill-material-expressive-skill-2026-11-17
   security_admission: reviewed-approve-bound
+  covers:
+    - material-3
+    - expressive
+    - android-ui
+    - accessibility
+  search_hint: >-
+    track: skill — asimawdah/material-expressive-skill Material 3 Expressive
+    design skill (metadata locator only; install/run out of band after
+    operator judgment).
+  auth: none
+  added_at: "2026-11-17"

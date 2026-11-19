@@ -437,6 +437,21 @@ def validate_entry(
     return errs
 
 
+def entry_git_commit(entry: dict) -> str | None:
+    """Reviewed git pin on a skill pool row (source preferred, version_labels ok).
+
+    Not a locator: SOURCE_LOCATOR_KEYS intentionally omits git_commit so a
+    commit SHA cannot be mistaken for an install URL.
+    """
+    src = entry.get("source") or {}
+    if isinstance(src, dict) and src.get("git_commit"):
+        return str(src["git_commit"]).strip().lower() or None
+    labels = entry.get("version_labels") or {}
+    if isinstance(labels, dict) and labels.get("git_commit"):
+        return str(labels["git_commit"]).strip().lower() or None
+    return None
+
+
 def validate_skill_evidence(reviews: list[dict], root: Path) -> list[str]:
     errs: list[str] = []
     for rev in reviews:
@@ -470,6 +485,125 @@ def validate_skill_evidence(reviews: list[dict], root: Path) -> list[str]:
                     f"review {rev.get('id')}: evidence missing {len(missing)} files "
                     f"(e.g. {missing[0]})"
                 )
+            # Capture manifests that list binary digests must themselves be pinned.
+            src_name = "hashes-source.json"
+            src_path = evidence_dir / src_name
+            if src_path.is_file():
+                if src_name not in expected:
+                    errs.append(
+                        f"review {rev.get('id')}: {src_name} exists on disk but is "
+                        "not listed in hashes.json (binaries would be unpinned)"
+                    )
+                else:
+                    digest = secu.sha256_bytes(src_path.read_bytes())
+                    if digest != str(expected[src_name]).lower():
+                        errs.append(
+                            f"review {rev.get('id')}: {src_name} hash mismatch vs "
+                            "hashes.json entry"
+                        )
+    return errs
+
+
+def validate_skill_pool_pins(
+    entries: list[dict],
+    reviews: list[dict],
+    root: Path,
+) -> list[str]:
+    """Require reviewed git commit + evidence path on gated skill pool rows.
+
+    When the bound approve review pins binds_to.git_commit, the pool row must
+    record the same commit under source.git_commit (preferred) or
+    version_labels.git_commit, and must point content_integrity.file_hashes_path
+    at the evidence hashes.json whose rollup equals package_integrity.
+    """
+    errs: list[str] = []
+    by_id = {
+        r.get("id"): r
+        for r in reviews
+        if isinstance(r, dict) and r.get("id")
+    }
+    for entry in entries:
+        if not isinstance(entry, dict) or not entry.get("id"):
+            continue
+        status = normalize_status(entry.get("status"))
+        if status not in GATED_STATUSES:
+            continue
+        eid = entry["id"]
+        ci = entry.get("content_integrity") or {}
+        if not isinstance(ci, dict):
+            ci = {}
+        hashes_rel = ci.get("file_hashes_path")
+        if not hashes_rel:
+            errs.append(
+                f"skill/{eid}: gated skill row requires "
+                "content_integrity.file_hashes_path"
+            )
+            continue
+        hashes_path = root / str(hashes_rel)
+        if not hashes_path.is_file():
+            errs.append(
+                f"skill/{eid}: file_hashes_path missing on disk: {hashes_rel}"
+            )
+            continue
+        try:
+            file_hashes = json.loads(hashes_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            errs.append(f"skill/{eid}: file_hashes_path unreadable ({exc})")
+            continue
+        if not isinstance(file_hashes, dict) or not file_hashes:
+            errs.append(f"skill/{eid}: file_hashes_path is not a path→sha256 map")
+            continue
+        expected_pin = ci.get("package_integrity")
+        recomputed = secu.package_integrity_from_hashes(
+            {str(k): str(v) for k, v in file_hashes.items()}
+        )
+        if expected_pin and expected_pin != recomputed:
+            errs.append(
+                f"skill/{eid}: package_integrity does not match rollup of "
+                f"{hashes_rel}"
+            )
+        # Prefer matching review via admission helpers when possible.
+        rev = None
+        rid = entry.get("security_review_id")
+        if rid and rid in by_id:
+            rev = by_id[rid]
+        if rev is None:
+            rev = secu.find_matching_review(
+                "skill",
+                locator=secu.entry_locator(entry),
+                resource_id=eid,
+                reviews=reviews,
+            )
+        if rev is None:
+            continue
+        binds = rev.get("binds_to") or {}
+        review_commit = binds.get("git_commit")
+        if review_commit:
+            review_commit = str(review_commit).strip().lower()
+            pool_commit = entry_git_commit(entry)
+            if not pool_commit:
+                errs.append(
+                    f"skill/{eid}: review pins git_commit={review_commit} but pool "
+                    "row has no source.git_commit / version_labels.git_commit"
+                )
+            elif pool_commit != review_commit:
+                errs.append(
+                    f"skill/{eid}: pool git_commit {pool_commit} != review "
+                    f"binds_to.git_commit {review_commit}"
+                )
+        evidence_rel = (rev.get("scope") or {}).get("evidence_dir") or ""
+        if evidence_rel:
+            # Normalize trailing slashes for comparison.
+            expected_hashes = str(Path(evidence_rel) / "hashes.json").replace("\\", "/")
+            got = str(hashes_rel).replace("\\", "/").lstrip("./")
+            if got != expected_hashes and got != expected_hashes.lstrip("./"):
+                # Allow either exact evidence hashes path or an equivalent path.
+                ev_hashes = root / evidence_rel / "hashes.json"
+                if hashes_path.resolve() != ev_hashes.resolve():
+                    errs.append(
+                        f"skill/{eid}: file_hashes_path {hashes_rel} does not match "
+                        f"review evidence_dir {evidence_rel}"
+                    )
     return errs
 
 
@@ -606,6 +740,9 @@ def run(*, base_ref: str | None = None) -> int:
     errors.extend(validate_reviews(reviews))
     errors.extend(validate_skill_evidence(reviews, ROOT))
     errors.extend(validate_web_evidence(reviews, ROOT))
+
+    skill_entries = load_list(ROOT / "skills.yaml")
+    errors.extend(validate_skill_pool_pins(skill_entries, reviews, ROOT))
 
     for track, path in (("web", ROOT / "sites.yaml"), ("skill", ROOT / "skills.yaml")):
         for entry in load_list(path):

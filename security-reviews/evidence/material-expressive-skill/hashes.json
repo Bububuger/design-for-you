@@ -21,5 +21,6 @@
   "files/scripts/validate_skill.py": "7fa178aeb498267378166e89abe54fd7755ec96029e31bfe617fed3818eab4d2",
   "files/templates/design-brief.md": "d0042058c0f005e65e991d31ed21506d1ee6c2fef4ee01dc0a1be84300f38383",
   "files/templates/implementation-handoff.md": "b8b62babbf73b9e9d77c4ae3137ebf515d140a6025eb3d0db2cfe4b2b62caafa",
-  "files/tests/test_validate_skill.py": "f9fd8a3c93dabb369dbdcc7d6442314d14a29bffb4facafa4b6ada1525215d86"
+  "files/tests/test_validate_skill.py": "f9fd8a3c93dabb369dbdcc7d6442314d14a29bffb4facafa4b6ada1525215d86",
+  "hashes-source.json": "55a4391365a4a3b2c0d5f2935d8d929a92b98c8f85064e4b3244481aae1021e9"
 }

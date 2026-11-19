@@ -18,7 +18,7 @@ reviewer:
     scripts NOT executed; plugins NOT installed; no Stitch API key used.
 conclusion: approve
 binds_to:
-  package_integrity_sha256: 00d5e0bc612d9dd86c2cad5e44d2ec494800ebc4340224ae104dcf448dc9ef3f
+  package_integrity_sha256: 520568cc5b913baa38d6b858de75a1d9a250370ccb66817c07f3ad32859a49e7
   git_commit: 0337446dadde6f8c94210444e2aa9d546126480f
   file_count: 88
   skill_md_count: 16
@@ -26,10 +26,13 @@ binds_to:
     repo convention (security_admission.package_integrity_from_hashes): sha256 of
     newline-joined '<path>=<sha256>' lines over the evidence manifest
     (hashes.json), paths sorted. Evidence holds every UTF-8 text file of the
-    package at the pinned commit (88 files); 0 binary asset(s) are bound by
-    git_commit + the full capture manifest kept in hashes-source.json.
-    Migrated 2026-11-17 from the capture-time sha256sum-style rollup; every
-    per-file sha256 is unchanged and was re-verified against the pinned commit.
+    package at the pinned commit (88 files) plus hashes-source.json itself.
+    No binary assets in this package; hashes-source.json (full capture
+    manifest) is an entry in hashes.json and therefore covered by
+    package_integrity_sha256; git_commit remains the upstream pin. Migrated
+    2026-11-17 from the capture-time sha256sum-style rollup; every per-file
+    sha256 is unchanged and was re-verified against the pinned commit.
+    hashes-source.json was added to hashes.json on 2026-11-19.
 scope:
   method: static-clone-hash-and-read
   covered:
@@ -161,16 +164,20 @@ findings:
       X-Goog-Api-Key header, matching the official Stitch API pattern. No
       other network destination appears in the script.
   - id: F3
-    severity: low
+    severity: medium
     category: credential_access_pattern
     judgment: residual_risk_documented_not_blocking
     summary: >-
       upload-to-stitch SKILL.md instructs the agent to locate the user's
-      active MCP server configuration file and extract the Stitch API key
-      from it, falling back to asking the user. This is the skill's stated
-      function and, per F2, the key transits only to Google's endpoint; but
-      operators should prefer supplying the key via the --api-key flag or
-      environment rather than agent scraping of config files. This
+      active MCP server configuration (~/.claude.json, ~/.gemini/settings.json,
+      mcp_config.json, and similar) and extract the Stitch API key from it,
+      falling back to asking the user. Those config files may contain other
+      MCP credentials beyond Stitch. The same skill also tells the agent to
+      read httpUrl / endpoint from that config, and upload_to_stitch.py
+      accepts --api-url; the key is therefore sent to whatever base URL is
+      configured, not only Google's default stitch.googleapis.com endpoint.
+      Usage restriction: operators must supply the key via --api-key or
+      environment; agents must not scan local config files for keys. This
       admission grants no credential access.
   - id: F4
     severity: note
@@ -200,6 +207,12 @@ notes: >-
   Fed from the GitHub Hot routine (2026-11-16 issue, new entry
   google-labs-code/stitch-skills) as a design/UI-generation skill collection
   for the skill track. Serious unresolved malicious findings were not
-  established under static review. Residual risks (API-key handling pattern,
-  mutable upstream) are documented; actual agent verification remains
-  not_tested.
+  established under static review. Residual risks (medium: agent-directed
+  local-config API-key scraping and configurable --api-url destination;
+  mutable upstream) are documented with a usage restriction forbidding
+  agent config scanning; actual agent verification remains not_tested.
+usage_restrictions:
+  - Do not let the agent scan ~/.claude.json, ~/.gemini/settings.json,
+    mcp_config.json, or other local MCP/config files for API keys.
+  - Supply Stitch credentials only via explicit --api-key / environment
+    after operator confirmation of the destination --api-url.
