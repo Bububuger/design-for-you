@@ -10,6 +10,8 @@ Observable behaviors covered:
 
 from __future__ import annotations
 
+import json
+import re
 import sys
 import tempfile
 import unittest
@@ -652,32 +654,83 @@ class TestDocsRetryAndPrNone(unittest.TestCase):
 
 
 class TestInboxIssueTemplateParse(unittest.TestCase):
-    """Unmodified GitHub issue template must not invent kind/covers."""
+    """Unmodified GitHub issue template must not invent track/kind/covers."""
 
     @staticmethod
-    def _template_issue_body() -> str:
-        """Body as GitHub creates it (YAML front matter stripped)."""
-        raw = (
+    def _template_raw() -> str:
+        return (
             ROOT / ".github" / "ISSUE_TEMPLATE" / "inbox.md"
         ).read_text(encoding="utf-8")
+
+    @classmethod
+    def _template_issue_body(cls) -> str:
+        """Body as GitHub creates it (YAML front matter stripped)."""
+        raw = cls._template_raw()
         if raw.startswith("---"):
             parts = raw.split("---", 2)
             if len(parts) >= 3:
                 return parts[2]
         return raw
 
-    def test_unmodified_template_has_empty_kind_and_covers(self) -> None:
+    @classmethod
+    def _template_default_title(cls) -> str:
+        raw = cls._template_raw()
+        m = re.search(r'(?m)^title:\s*["\']?(.+?)["\']?\s*$', raw)
+        assert m, "issue template must declare title:"
+        return m.group(1).strip().strip('"').strip("'")
+
+    def test_unmodified_template_has_empty_track_kind_and_covers(self) -> None:
         body = self._template_issue_body()
         labels = parse_explicit_labels(body)
-        self.assertEqual(labels.get("track"), "web")
+        self.assertNotIn("track", labels)
         self.assertNotIn("kind", labels)
         self.assertNotIn("invalid_kind", labels)
         self.assertNotIn("covers", labels)
-        # Guard: template must not pre-fill a concrete kind value.
+        # Guard: template must not pre-fill concrete track/kind values.
+        self.assertNotRegex(
+            body,
+            r"(?m)^[ \t]*track[ \t]*:[ \t]*(web|video|skill)\b",
+        )
         self.assertNotRegex(
             body,
             r"(?m)^[ \t]*kind[ \t]*:[ \t]*[a-z0-9_-]+",
         )
+
+    def test_template_plus_track_skill_line_parses_skill(self) -> None:
+        body = self._template_issue_body() + "\ntrack: skill\n"
+        labels = parse_explicit_labels(body)
+        self.assertEqual(labels.get("track"), "skill")
+        self.assertNotIn("kind", labels)
+        self.assertNotIn("covers", labels)
+
+    def test_unmodified_template_title_and_body_skip_fetch(self) -> None:
+        """Default title must not look like a URL; inbox path → rejected_no_url."""
+        import os
+        from unittest.mock import patch
+
+        title = self._template_default_title()
+        body = self._template_issue_body()
+        self.assertFalse(title.startswith("http"))
+        self.assertNotIn("://", title)
+        with patch.dict(
+            os.environ,
+            {"ISSUE_TITLE": title, "ISSUE_BODY": body},
+            clear=False,
+        ):
+            with patch("triage.triage_url") as mock_triage:
+                with patch("triage.fetch_html") as mock_fetch:
+                    with patch("triage.normalize_url") as mock_norm:
+                        with patch("builtins.print"):
+                            rc = triage.cmd_inbox_from_env()
+                        self.assertEqual(rc, 0)
+                        mock_triage.assert_not_called()
+                        mock_fetch.assert_not_called()
+                        mock_norm.assert_not_called()
+        result = json.loads(
+            Path("/tmp/triage-result.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(result.get("decision"), "rejected_no_url")
+        self.assertIn("未找到 URL", result.get("comment") or "")
 
     def test_empty_kind_line_does_not_steal_covers_as_kind(self) -> None:
         labels = parse_explicit_labels("track: web\nkind:\ncovers: landing\n")
