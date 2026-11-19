@@ -1369,6 +1369,46 @@ def triage_url(
     return result
 
 
+# Bot comment markers used by inbox.yml dedup (keep in sync with workflow callers).
+# Terminal = settled outcomes; reopened must NOT retry these.
+INBOX_DEDUP_TERMINAL_MARKERS: tuple[str, ...] = (
+    "✅ 已入",
+    "⏭️ 重复",
+    "🚫 当前冻结普通 landing",
+    "🚫 **rejected_security_blocked**",
+    "🚫 非白名单作者",
+)
+# Non-terminal = retryable after maintainer fixes review / kind / etc.
+INBOX_DEDUP_RETRYABLE_MARKERS: tuple[str, ...] = (
+    "🛡️ **pending_security_review**",
+    "👀 **needs_human**",
+    "⚠️ **非法 kind**",
+)
+INBOX_DEDUP_ANY_MARKERS: tuple[str, ...] = (
+    INBOX_DEDUP_TERMINAL_MARKERS + INBOX_DEDUP_RETRYABLE_MARKERS
+)
+
+
+def inbox_dedup_should_skip(action: str, bot_comment_bodies: list[str]) -> bool:
+    """Whether inbox Actions should skip triage for this event.
+
+    - ``opened`` / ``labeled``: skip if *any* prior bot triage comment exists
+      (collapses create-with-label dual fire and opened→add-label→labeled races).
+    - ``reopened``: skip only for *terminal* conclusions (accepted / duplicate /
+      landing freeze / security blocked / allowlist reject). Pending security
+      review, needs_human, and illegal-kind comments must allow a real retry.
+    """
+    act = (action or "").strip().lower()
+    bodies = [b or "" for b in (bot_comment_bodies or [])]
+    if act == "reopened":
+        markers = INBOX_DEDUP_TERMINAL_MARKERS
+    else:
+        # opened, labeled, or unknown: treat any prior triage comment as done
+        # for this delivery (prevents double comments / double pushes).
+        markers = INBOX_DEDUP_ANY_MARKERS
+    return any(any(m in body for m in markers) for body in bodies)
+
+
 def build_inbox_comment(result: dict[str, Any]) -> str:
     """Markdown comment posted by Actions after triage (observable bot output)."""
     decision = result.get("decision")
@@ -1488,6 +1528,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     sub.add_parser("inbox", help="Actions: triage from ISSUE_TITLE/BODY env")
 
+    d = sub.add_parser(
+        "inbox-dedup",
+        help="Actions: decide whether to skip triage (JSON on stdin → skip 0|1)",
+    )
+    d.add_argument(
+        "--action",
+        required=True,
+        help="GitHub issues event action: opened|labeled|reopened",
+    )
+
     c = sub.add_parser("counts", help="Print seat counts JSON")
     c.add_argument(
         "--track",
@@ -1514,6 +1564,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.cmd == "inbox":
         return cmd_inbox_from_env()
+    if args.cmd == "inbox-dedup":
+        payload = json.loads(sys.stdin.read() or "{}")
+        bodies = payload.get("bodies") or []
+        if not isinstance(bodies, list):
+            bodies = []
+        skip = inbox_dedup_should_skip(args.action, [str(b) for b in bodies])
+        # Observable line for Actions + tests.
+        print("1" if skip else "0")
+        return 0
     if args.cmd == "triage":
         out = triage_url(
             args.url,

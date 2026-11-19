@@ -23,9 +23,13 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 import security_admission as secu  # noqa: E402
 from triage import (  # noqa: E402
+    INBOX_DEDUP_ANY_MARKERS,
+    INBOX_DEDUP_RETRYABLE_MARKERS,
+    INBOX_DEDUP_TERMINAL_MARKERS,
     build_inbox_comment,
     format_pr_ref,
     format_security_review_cite,
+    inbox_dedup_should_skip,
     parse_explicit_labels,
     slug_id,
     strip_pr_none_mentions,
@@ -248,27 +252,140 @@ class TestInvalidKindFailClosed(unittest.TestCase):
 
 
 class TestInboxWorkflowDedup(unittest.TestCase):
-    """Defect 3: workflow must not double-fire on create-with-inbox-label."""
+    """Dual-trigger collapse + reopened retry + http-without-label entry."""
 
-    def test_workflow_does_not_listen_to_opened(self) -> None:
+    def test_workflow_listens_to_opened_labeled_reopened(self) -> None:
         text = INBOX_WORKFLOW.read_text(encoding="utf-8")
-        # types line must be labeled+reopened only (not the dual opened+labeled trigger).
-        self.assertRegex(text, r"types:\s*\[labeled,\s*reopened\]")
-        self.assertNotRegex(
-            text,
-            r"types:\s*\[[^\]]*\bopened\b[^\]]*\]",
+        self.assertRegex(
+            text, r"types:\s*\[opened,\s*labeled,\s*reopened\]"
         )
 
-    def test_labeled_filtered_to_inbox_label_only(self) -> None:
+    def test_job_if_partitions_opened_without_inbox_http(self) -> None:
+        """Third-party path: opened + title http + no inbox label."""
         text = INBOX_WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("github.event.label.name == 'inbox'", text)
+        self.assertIn("github.event.action == 'opened'", text)
+        self.assertIn("contains(github.event.issue.title, 'http')", text)
+        self.assertIn(
+            "!contains(join(github.event.issue.labels.*.name, ','), 'inbox')",
+            text,
+        )
 
-    def test_idempotent_skip_step_present(self) -> None:
+    def test_job_if_skips_opened_when_inbox_already_present(self) -> None:
+        """Create-with-inbox: only labeled runs (opened requires !inbox)."""
         text = INBOX_WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("Skip if already triaged", text)
+        # opened arm requires absence of inbox; labeled arm requires inbox label.
+        self.assertIn("github.event.label.name == 'inbox'", text)
+        self.assertIn("github.event.action == 'labeled'", text)
+
+    def test_ensure_inbox_label_after_comment(self) -> None:
+        text = INBOX_WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("Ensure inbox label", text)
+        # Label step must come after Comment so follow-up labeled can dedup.
+        comment_at = text.index("Comment and close")
+        label_at = text.index("Ensure inbox label")
+        self.assertGreater(label_at, comment_at)
+
+    def test_dedup_uses_python_policy(self) -> None:
+        text = INBOX_WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("inbox-dedup", text)
         self.assertIn("steps.dedup.outputs.skip", text)
-        # Ensure label auto-add (which re-fired labeled) is gone.
-        self.assertNotIn("Ensure inbox label", text)
+
+    def test_labeled_after_pending_comment_skips(self) -> None:
+        pending = "🛡️ **pending_security_review**：缺少审查\n- admission: `missing`"
+        self.assertTrue(inbox_dedup_should_skip("labeled", [pending]))
+        self.assertTrue(inbox_dedup_should_skip("opened", [pending]))
+
+    def test_reopened_after_pending_does_not_skip(self) -> None:
+        pending = "🛡️ **pending_security_review**：缺少审查\n- admission: `missing`"
+        human = "👀 **needs_human**：初筛无法自动确认"
+        illegal = "⚠️ **非法 kind**：`gallery` 不是轨 `web` 的合法类型"
+        for body in (pending, human, illegal):
+            self.assertFalse(
+                inbox_dedup_should_skip("reopened", [body]),
+                body,
+            )
+
+    def test_reopened_after_terminal_still_skips(self) -> None:
+        for body in (
+            "✅ 已入 **skill candidate**：`craft`",
+            "⏭️ 重复：已在池或墓碑中 — `{'id': 'x'}`",
+            "🚫 当前冻结普通 landing 新站（Web 轨；见 STATUS.md）。",
+            "🚫 **rejected_security_blocked**：存在 conclusion=block",
+            "🚫 非白名单作者。本仓 inbox 仅接受维护者 / 授权 Bot 投喂。已关闭。",
+        ):
+            self.assertTrue(
+                inbox_dedup_should_skip("reopened", [body]),
+                body,
+            )
+
+    def test_broad_ban_emoji_alone_is_not_terminal_on_reopen(self) -> None:
+        # Narrow 🚫 matching: a random ban-emoji comment must not block retry.
+        self.assertFalse(
+            inbox_dedup_should_skip("reopened", ["🚫 something unrelated"])
+        )
+
+    def test_cli_inbox_dedup_observable(self) -> None:
+        import json
+        import subprocess
+
+        payload = json.dumps(
+            {
+                "bodies": [
+                    "🛡️ **pending_security_review**：x",
+                ]
+            }
+        )
+        for action, expect in (("labeled", "1"), ("reopened", "0")):
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "triage.py"),
+                    "inbox-dedup",
+                    "--action",
+                    action,
+                ],
+                input=payload,
+                text=True,
+                capture_output=True,
+                check=True,
+                cwd=str(ROOT),
+            )
+            self.assertEqual(proc.stdout.strip().splitlines()[-1], expect, action)
+
+    def test_marker_sets_disjoint_and_cover_build_inbox_comment(self) -> None:
+        # Retryable must not be treated as terminal.
+        for m in INBOX_DEDUP_RETRYABLE_MARKERS:
+            self.assertNotIn(m, INBOX_DEDUP_TERMINAL_MARKERS)
+        self.assertEqual(
+            set(INBOX_DEDUP_ANY_MARKERS),
+            set(INBOX_DEDUP_TERMINAL_MARKERS) | set(INBOX_DEDUP_RETRYABLE_MARKERS),
+        )
+        # build_inbox_comment outputs must be detectable by the marker sets.
+        pending = build_inbox_comment(
+            {
+                "decision": "pending_security_review",
+                "track": "skill",
+                "security_admission": {"status": "missing", "reason": "x"},
+                "draft": {"id": "craft"},
+            }
+        )
+        self.assertTrue(
+            any(m in pending for m in INBOX_DEDUP_RETRYABLE_MARKERS)
+        )
+        accepted = build_inbox_comment(
+            {
+                "decision": "accept_candidate",
+                "track": "web",
+                "entry": {
+                    "id": "x",
+                    "url": "https://example.com/",
+                    "kind": "component",
+                    "covers": [],
+                },
+                "label_source": "rules",
+            }
+        )
+        self.assertTrue(any(m in accepted for m in INBOX_DEDUP_TERMINAL_MARKERS))
 
 
 class TestPrNoneNeverEmitted(unittest.TestCase):
