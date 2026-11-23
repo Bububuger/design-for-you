@@ -12,7 +12,7 @@
     "minimal-gallery": 0,
     "dark-mode-design": 0,
     "dark-design": 0,
-    "awwwards": 0,
+    "awwwards": 1,
     "httpster": 0,
     "refero-styles": 0,
     "uizze": 0,
@@ -35,5 +35,5 @@
     "official-design-md": 0,
     "uxpatterns-empty-states": 0
   },
-  "updated": "2026-11-16"
+  "updated": "2026-11-23"
 }

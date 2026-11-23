@@ -1,6 +1,6 @@
 # Design For You 缺口悬赏单
 
-> 自动生成于 2026-11-17。
+> 自动生成于 2026-11-23。
 > **暂不接收普通 `landing`（整站/营销落地页）新站。** landing 席位已超配或接近满席，冻结新增（仅 Web 轨）。
 > **新 Web / Skill 入库需已提交的 security admission review**（见 `security-reviews/`）；Issue 正文自称 approved 无效。存量 web/video 按 legacy-unreviewed 兼容，不批量盖章安全。
 
